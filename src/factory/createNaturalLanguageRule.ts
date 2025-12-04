@@ -113,7 +113,9 @@ export function createNaturalLanguageRule(
                 this.parseAIResponse(response, segments, fullText);
             } catch (error) {
                 // Silently fail - AI errors shouldn't crash the linter
-                console.error('Natural language rule scan failed:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('[Tiptap Linter] Natural language rule scan failed:', error);
+                }
             }
 
             return this;

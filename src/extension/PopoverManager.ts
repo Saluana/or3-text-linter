@@ -17,6 +17,8 @@ import { createApp, type App } from 'vue';
 export function createDefaultPopover(context: PopoverContext): HTMLElement {
     const container = document.createElement('div');
     container.className = 'lint-popover';
+    container.setAttribute('role', 'dialog');
+    container.setAttribute('aria-label', 'Lint issue details');
 
     for (const issue of context.issues) {
         const issueEl = document.createElement('div');
@@ -42,6 +44,8 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
             const fixBtn = document.createElement('button');
             fixBtn.className = 'lint-popover__btn lint-popover__btn--fix';
             fixBtn.textContent = 'Fix';
+            fixBtn.setAttribute('aria-label', `Apply fix for: ${issue.message}`);
+            fixBtn.setAttribute('type', 'button');
             fixBtn.onclick = () => context.actions.applyFix();
             actions.appendChild(fixBtn);
         }
@@ -49,6 +53,8 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
         const dismissBtn = document.createElement('button');
         dismissBtn.className = 'lint-popover__btn lint-popover__btn--dismiss';
         dismissBtn.textContent = 'Dismiss';
+        dismissBtn.setAttribute('aria-label', `Dismiss lint issue: ${issue.message}`);
+        dismissBtn.setAttribute('type', 'button');
         dismissBtn.onclick = () => context.actions.dismiss();
         actions.appendChild(dismissBtn);
 
@@ -89,6 +95,21 @@ export class PopoverManager {
      * @param anchorEl - The element to position the popover relative to
      */
     show(issues: Issue[], anchorEl: HTMLElement): void {
+        // Validate inputs
+        if (!issues || !Array.isArray(issues) || issues.length === 0) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[Tiptap Linter] PopoverManager.show() called with invalid issues array');
+            }
+            return;
+        }
+        
+        if (!anchorEl || !(anchorEl instanceof HTMLElement)) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[Tiptap Linter] PopoverManager.show() called with invalid anchor element');
+            }
+            return;
+        }
+        
         // Close any existing popover first
         this.hide();
 
@@ -332,7 +353,7 @@ export class PopoverManager {
      */
     private deleteText(issues: Issue[]): void {
         const issue = issues[0];
-        if (issue) {
+        if (issue && issue.from >= 0 && issue.to <= this.view.state.doc.content.size) {
             this.view.dispatch(this.view.state.tr.delete(issue.from, issue.to));
             this.view.focus();
         }
@@ -350,7 +371,7 @@ export class PopoverManager {
      */
     private replaceText(issues: Issue[], newText: string): void {
         const issue = issues[0];
-        if (issue) {
+        if (issue && issue.from >= 0 && issue.to <= this.view.state.doc.content.size) {
             this.view.dispatch(
                 this.view.state.tr.replaceWith(
                     issue.from,

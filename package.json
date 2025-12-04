@@ -1,15 +1,66 @@
 {
     "name": "tiptap-linter",
-    "module": "index.ts",
+    "version": "1.0.0",
+    "description": "A comprehensive, extensible linting solution for Tiptap and ProseMirror editors with AI-powered rules and customizable popovers",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md",
+        "SECURITY.md",
+        "CONTRIBUTING.md"
+    ],
+    "keywords": [
+        "tiptap",
+        "prosemirror",
+        "linter",
+        "editor",
+        "ai",
+        "natural-language",
+        "writing",
+        "grammar",
+        "style-guide"
+    ],
+    "author": "",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Saluana/or3-text-linter"
+    },
+    "bugs": {
+        "url": "https://github.com/Saluana/or3-text-linter/issues"
+    },
+    "homepage": "https://github.com/Saluana/or3-text-linter#readme",
     "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "clean": "rm -rf dist",
+        "prebuild": "npm run clean",
+        "prepublishOnly": "npm run build && npm test",
         "test": "vitest --run",
         "test:watch": "vitest",
         "dev": "vite"
     },
-    "dependencies": {
+    "peerDependencies": {
         "@tiptap/core": "^2.1.0",
         "@tiptap/pm": "^2.1.0",
+        "vue": "^3.0.0"
+    },
+    "peerDependenciesMeta": {
+        "vue": {
+            "optional": true
+        }
+    },
+    "dependencies": {
         "@tiptap/vue-3": "^2.1.0",
         "@tiptap/extension-document": "^2.1.0",
         "@tiptap/extension-paragraph": "^2.1.0",
