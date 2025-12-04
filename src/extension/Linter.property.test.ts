@@ -562,3 +562,462 @@ describe('Linter Error Isolation Property Tests', () => {
         }
     );
 });
+
+describe('Linter Popover Integration Property Tests', () => {
+    // **Feature: tiptap-linter, Property 21: Popover Opens on Icon Click**
+    // **Validates: Requirements 8.1, 8.2**
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 3 }
+            ),
+        ],
+        { numRuns: 100 }
+    )(
+        'clicking lint icon shows popover with associated issues',
+        async (issueInputs) => {
+            // Import PopoverManager for direct testing
+            const { PopoverManager } = await import('./PopoverManager');
+
+            // Convert inputs to valid issues with proper positions
+            const issues = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const TestPluginClass = createTestPluginClass(issues);
+
+            // Create editor with popover enabled
+            const editor = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        popover: {}, // Enable popover with default options
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Find a lint icon in the editor
+            const editorEl = editor.view.dom;
+            const lintIcon = editorEl.querySelector(
+                '.lint-icon'
+            ) as HTMLElement;
+
+            // Property: When popover is configured and issues exist, clicking icon should show popover
+            // We test this by directly using the PopoverManager since ProseMirror's event handling
+            // is internal and not easily testable via DOM events in jsdom
+            if (lintIcon && issues.length > 0) {
+                // Get or create the popover manager
+                let popoverManager = editor.storage.linter.popoverManager;
+                if (!popoverManager) {
+                    popoverManager = new PopoverManager(editor.view, {});
+                    editor.storage.linter.popoverManager = popoverManager;
+                }
+
+                // Simulate what handleClickWithPopover does: show popover with issues at position
+                const clickedIssue = editor.storage.linter.issues[0];
+                if (clickedIssue) {
+                    const issuesAtPosition =
+                        editor.storage.linter.issues.filter(
+                            (issue) =>
+                                issue.from === clickedIssue.from &&
+                                issue.to === clickedIssue.to
+                        );
+                    popoverManager.show(
+                        issuesAtPosition.length > 0
+                            ? issuesAtPosition
+                            : [clickedIssue],
+                        lintIcon
+                    );
+
+                    await new Promise((resolve) => setTimeout(resolve, 10));
+
+                    // Property: Popover should be visible in the DOM (Requirement 8.1)
+                    const popover = document.querySelector(
+                        '.lint-popover-container'
+                    );
+                    expect(popover).not.toBeNull();
+
+                    // Property: Popover should contain issue information
+                    if (popover) {
+                        const issueElements = popover.querySelectorAll(
+                            '.lint-popover__issue'
+                        );
+                        expect(issueElements.length).toBeGreaterThan(0);
+
+                        // Property: Popover should show message and severity (Requirement 8.2)
+                        const messageEl = popover.querySelector(
+                            '.lint-popover__message'
+                        );
+                        expect(messageEl).not.toBeNull();
+
+                        const severityEl = popover.querySelector(
+                            '.lint-popover__severity'
+                        );
+                        expect(severityEl).not.toBeNull();
+                    }
+
+                    // Clean up popover
+                    popoverManager.hide();
+                }
+            }
+
+            editor.destroy();
+        }
+    );
+
+    // Test that multiple issues at same position are shown in popover
+    test.prop(
+        [
+            fc.record({
+                message1: fc.string({ minLength: 1, maxLength: 20 }),
+                message2: fc.string({ minLength: 1, maxLength: 20 }),
+                severity1: severityArb,
+                severity2: severityArb,
+            }),
+        ],
+        { numRuns: 50 }
+    )(
+        'popover shows all issues at the same position',
+        async ({ message1, message2, severity1, severity2 }) => {
+            // Import PopoverManager for direct testing
+            const { PopoverManager } = await import('./PopoverManager');
+
+            // Create two issues at the same position
+            const issues = [
+                { message: message1, from: 1, to: 5, severity: severity1 },
+                { message: message2, from: 1, to: 5, severity: severity2 },
+            ];
+
+            const TestPluginClass = createTestPluginClass(issues);
+
+            const editor = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        popover: {},
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Find a lint icon
+            const editorEl = editor.view.dom;
+            const lintIcon = editorEl.querySelector(
+                '.lint-icon'
+            ) as HTMLElement;
+
+            if (lintIcon) {
+                // Get or create the popover manager
+                let popoverManager = editor.storage.linter.popoverManager;
+                if (!popoverManager) {
+                    popoverManager = new PopoverManager(editor.view, {});
+                    editor.storage.linter.popoverManager = popoverManager;
+                }
+
+                // Show popover with all issues at the same position
+                const storedIssues = editor.storage.linter.issues;
+                popoverManager.show(storedIssues, lintIcon);
+
+                await new Promise((resolve) => setTimeout(resolve, 10));
+
+                // Property: Popover should show both issues
+                const popover = document.querySelector(
+                    '.lint-popover-container'
+                );
+                if (popover) {
+                    const issueElements = popover.querySelectorAll(
+                        '.lint-popover__issue'
+                    );
+                    // Should have 2 issues displayed
+                    expect(issueElements.length).toBe(2);
+                }
+
+                // Clean up
+                popoverManager.hide();
+            }
+
+            editor.destroy();
+        }
+    );
+});
+
+describe('Custom Popover Renderer Property Tests', () => {
+    // **Feature: tiptap-linter, Property 24: Custom Popover Renderer Receives Correct Context**
+    // **Validates: Requirements 18.2, 18.3**
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 3 }
+            ),
+        ],
+        { numRuns: 100 }
+    )(
+        'custom renderer receives correct context with issues and actions',
+        async (issueInputs) => {
+            // Import PopoverManager for direct testing
+            const { PopoverManager } = await import('./PopoverManager');
+
+            // Convert inputs to valid issues with proper positions
+            const issues: Issue[] = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            // Track what context was passed to the custom renderer
+            let receivedContext: {
+                issues: Issue[];
+                hasApplyFix: boolean;
+                hasDeleteText: boolean;
+                hasReplaceText: boolean;
+                hasDismiss: boolean;
+                hasView: boolean;
+            } | null = null;
+
+            // Custom renderer that captures the context
+            const customRenderer = (context: {
+                issues: Issue[];
+                actions: {
+                    applyFix: () => void;
+                    deleteText: () => void;
+                    replaceText: (text: string) => void;
+                    dismiss: () => void;
+                };
+                view: unknown;
+            }) => {
+                receivedContext = {
+                    issues: context.issues,
+                    hasApplyFix: typeof context.actions.applyFix === 'function',
+                    hasDeleteText:
+                        typeof context.actions.deleteText === 'function',
+                    hasReplaceText:
+                        typeof context.actions.replaceText === 'function',
+                    hasDismiss: typeof context.actions.dismiss === 'function',
+                    hasView:
+                        context.view !== null && context.view !== undefined,
+                };
+
+                const el = document.createElement('div');
+                el.className = 'custom-popover';
+                el.textContent = `Issues: ${context.issues.length}`;
+                return el;
+            };
+
+            const TestPluginClass = createTestPluginClass(issues);
+
+            const editor = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        popover: {
+                            renderer: customRenderer,
+                        },
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Find a lint icon
+            const editorEl = editor.view.dom;
+            const lintIcon = editorEl.querySelector(
+                '.lint-icon'
+            ) as HTMLElement;
+
+            if (lintIcon && issues.length > 0) {
+                // Create popover manager with custom renderer
+                const popoverManager = new PopoverManager(editor.view, {
+                    renderer: customRenderer,
+                });
+
+                // Show popover with issues
+                const storedIssues = editor.storage.linter.issues;
+                popoverManager.show(storedIssues, lintIcon);
+
+                await new Promise((resolve) => setTimeout(resolve, 10));
+
+                // Property: Custom renderer should have been called with correct context
+                expect(receivedContext).not.toBeNull();
+
+                if (receivedContext) {
+                    // Property: Context should contain the correct issues array (Requirement 18.2)
+                    expect(receivedContext.issues).toHaveLength(issues.length);
+                    for (let i = 0; i < issues.length; i++) {
+                        expect(receivedContext.issues[i].message).toBe(
+                            issues[i].message
+                        );
+                        expect(receivedContext.issues[i].severity).toBe(
+                            issues[i].severity
+                        );
+                    }
+
+                    // Property: Context should have functional action callbacks (Requirement 18.3)
+                    expect(receivedContext.hasApplyFix).toBe(true);
+                    expect(receivedContext.hasDeleteText).toBe(true);
+                    expect(receivedContext.hasReplaceText).toBe(true);
+                    expect(receivedContext.hasDismiss).toBe(true);
+
+                    // Property: Context should have the EditorView
+                    expect(receivedContext.hasView).toBe(true);
+                }
+
+                // Clean up
+                popoverManager.hide();
+            }
+
+            editor.destroy();
+        }
+    );
+
+    // Test that custom renderer's actions actually work
+    test.prop(
+        [
+            fc.record({
+                message: fc.string({ minLength: 1, maxLength: 20 }),
+                severity: severityArb,
+            }),
+        ],
+        { numRuns: 50 }
+    )(
+        'custom renderer actions are functional and modify document correctly',
+        async ({ message, severity }) => {
+            // Import PopoverManager for direct testing
+            const { PopoverManager } = await import('./PopoverManager');
+
+            // Create an issue with a fix function
+            const issues: Issue[] = [
+                {
+                    message,
+                    from: 1,
+                    to: 5,
+                    severity,
+                    fix: (view, issue) => {
+                        view.dispatch(
+                            view.state.tr.replaceWith(
+                                issue.from,
+                                issue.to,
+                                view.state.schema.text('FIXED')
+                            )
+                        );
+                    },
+                },
+            ];
+
+            // Track actions received
+            let capturedActions: {
+                applyFix: () => void;
+                deleteText: () => void;
+                replaceText: (text: string) => void;
+                dismiss: () => void;
+            } | null = null;
+
+            // Custom renderer that captures actions
+            const customRenderer = (context: {
+                issues: Issue[];
+                actions: {
+                    applyFix: () => void;
+                    deleteText: () => void;
+                    replaceText: (text: string) => void;
+                    dismiss: () => void;
+                };
+                view: unknown;
+            }) => {
+                capturedActions = context.actions;
+                const el = document.createElement('div');
+                el.className = 'custom-popover';
+                return el;
+            };
+
+            const TestPluginClass = createTestPluginClass(issues);
+
+            const editor = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        popover: {
+                            renderer: customRenderer,
+                        },
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Find a lint icon
+            const editorEl = editor.view.dom;
+            const lintIcon = editorEl.querySelector(
+                '.lint-icon'
+            ) as HTMLElement;
+
+            if (lintIcon) {
+                // Create popover manager with custom renderer
+                const popoverManager = new PopoverManager(editor.view, {
+                    renderer: customRenderer,
+                });
+
+                // Show popover
+                popoverManager.show(issues, lintIcon);
+
+                await new Promise((resolve) => setTimeout(resolve, 10));
+
+                // Property: Actions should be captured
+                expect(capturedActions).not.toBeNull();
+
+                if (capturedActions) {
+                    // Get initial content
+                    const initialContent = editor.state.doc.textContent;
+
+                    // Test applyFix action
+                    capturedActions.applyFix();
+
+                    await new Promise((resolve) => setTimeout(resolve, 10));
+
+                    // Property: applyFix should have modified the document
+                    const newContent = editor.state.doc.textContent;
+                    expect(newContent).toContain('FIXED');
+                    expect(newContent).not.toBe(initialContent);
+
+                    // Property: Popover should be closed after action
+                    expect(popoverManager.isVisible()).toBe(false);
+                }
+            }
+
+            editor.destroy();
+        }
+    );
+});

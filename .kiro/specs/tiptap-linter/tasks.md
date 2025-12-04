@@ -175,7 +175,7 @@
         -   **Property 16: AI Response Malformed Handling**
         -   **Validates: Requirements 15.4**
 
--   [ ] 11. Checkpoint
+-   [x] 11. Checkpoint
 
     -   Ensure all tests pass, ask the user if questions arise.
 
@@ -223,32 +223,32 @@
         -   Update LinterOptions to include popover configuration
         -   _Requirements: 18.1, 18.5, 18.6_
 
--   [ ] 15. Popover manager implementation
+-   [x] 15. Popover manager implementation
 
-    -   [ ] 15.1 Implement PopoverManager class
+    -   [x] 15.1 Implement PopoverManager class
         -   Constructor accepts EditorView and PopoverOptions
         -   Implement show() method to display popover with issues
         -   Implement hide() method to close popover
         -   Implement positionPopover() for placement calculation
         -   Implement setupCloseHandlers() for click-outside and Escape key
         -   _Requirements: 8.1, 8.4, 18.6_
-    -   [ ] 15.2 Implement PopoverActions
+    -   [x] 15.2 Implement PopoverActions
         -   Implement applyFix action that executes fix function and closes popover
         -   Implement deleteText action that removes issue range and closes popover
         -   Implement replaceText action that substitutes text and closes popover
         -   Implement dismiss action that closes without changes
         -   Focus editor after document-modifying actions
         -   _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5_
-    -   [ ] 15.3 Write property test for popover actions
+    -   [x] 15.3 Write property test for popover actions
         -   **Property 22: Popover Actions Modify Document Correctly**
         -   **Validates: Requirements 19.1, 19.2, 19.3**
-    -   [ ] 15.4 Write property test for dismiss action
+    -   [x] 15.4 Write property test for dismiss action
         -   **Property 23: Popover Dismiss Closes Without Changes**
         -   **Validates: Requirements 8.4, 19.4**
 
--   [ ] 16. Default popover renderer
+-   [x] 16. Default popover renderer
 
-    -   [ ] 16.1 Implement createDefaultPopover function
+    -   [x] 16.1 Implement createDefaultPopover function
         -   Create container element with lint-popover class
         -   Render severity badge for each issue
         -   Render issue message
@@ -256,35 +256,35 @@
         -   Render Dismiss button
         -   Support multiple issues at same position
         -   _Requirements: 18.3, 18.7_
-    -   [ ] 16.2 Add popover CSS styles
+    -   [x] 16.2 Add popover CSS styles
         -   Style .lint-popover container with positioning
         -   Style severity variants (--info, --warning, --error)
         -   Style action buttons
         -   Add arrow/pointer indicator
         -   _Requirements: 9.3_
 
--   [ ] 17. Integrate popover with Linter extension
+-   [x] 17. Integrate popover with Linter extension
 
-    -   [ ] 17.1 Update Linter extension for popover support
+    -   [x] 17.1 Update Linter extension for popover support
         -   Add popover option to LinterOptions
         -   Create PopoverManager instance in addProseMirrorPlugins
         -   Update handleClick to show popover instead of selecting text
         -   Remove handleDoubleClick (replaced by popover actions)
         -   _Requirements: 8.1, 8.2, 8.3, 8.5_
-    -   [ ] 17.2 Write property test for popover opens on icon click
+    -   [x] 17.2 Write property test for popover opens on icon click
         -   **Property 21: Popover Opens on Icon Click**
         -   **Validates: Requirements 8.1, 8.2**
-    -   [ ] 17.3 Write property test for custom renderer context
+    -   [x] 17.3 Write property test for custom renderer context
         -   **Property 24: Custom Popover Renderer Receives Correct Context**
         -   **Validates: Requirements 18.2, 18.3**
 
--   [ ] 18. Checkpoint
+-   [x] 18. Checkpoint
 
     -   Ensure all tests pass, ask the user if questions arise.
 
--   [ ] 19. Update demo component with popover
+-   [x] 19. Update demo component with popover
 
-    -   [ ] 19.1 Update LinterDemo.vue to showcase popover
+    -   [x] 19.1 Update LinterDemo.vue to showcase popover
         -   Add popover CSS styles to demo
         -   Optionally demonstrate custom popover renderer
         -   Update sample content description

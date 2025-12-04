@@ -1,7 +1,6 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { TextSelection } from '@tiptap/pm/state';
 import type { Node as ProsemirrorNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 import type {
@@ -10,6 +9,7 @@ import type {
     AsyncLinterPluginClass,
     PopoverOptions,
 } from '../types';
+import { PopoverManager } from './PopoverManager';
 
 /**
  * Extended HTMLDivElement interface for lint icons with attached issue data
@@ -56,6 +56,8 @@ export interface LinterOptions {
 export interface LinterStorage {
     issues: Issue[];
     getIssues(): Issue[];
+    /** PopoverManager instance for programmatic popover control */
+    popoverManager: PopoverManager | null;
 }
 
 /**
@@ -154,6 +156,7 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
             getIssues() {
                 return this.issues;
             },
+            popoverManager: null as PopoverManager | null,
         };
     },
 
@@ -193,11 +196,26 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
                         return this.getState(state);
                     },
                     handleClick: (view, _pos, event) => {
-                        return handleClick(view, event);
+                        // Create PopoverManager lazily on first click if popover is enabled
+                        if (extension.options.popover !== undefined) {
+                            if (!extension.storage.popoverManager) {
+                                extension.storage.popoverManager =
+                                    new PopoverManager(
+                                        view,
+                                        extension.options.popover
+                                    );
+                            }
+                            return handleClickWithPopover(
+                                view,
+                                event,
+                                extension.storage.popoverManager,
+                                extension.storage.issues
+                            );
+                        }
+                        // Fall back to legacy behavior (select text) when popover is not configured
+                        return handleClickLegacy(view, event);
                     },
-                    handleDoubleClick: (view, _pos, event) => {
-                        return handleDoubleClick(view, event);
-                    },
+                    // handleDoubleClick removed - replaced by popover actions (Requirements 8.1, 8.2, 8.3)
                 },
             }),
         ];
@@ -267,60 +285,81 @@ export function createDecorationSet(
 }
 
 /**
- * Handle single click on lint icons - select the issue text range
+ * Handle click on lint icons with popover support - show popover with issue details
+ * Requirements: 8.1, 8.2, 8.3, 8.5
+ *
  * @param view - The EditorView
  * @param event - The mouse event
+ * @param popoverManager - The PopoverManager instance
+ * @param allIssues - All issues in the document (to find issues at same position)
  * @returns true if the click was handled, false otherwise
  */
-function handleClick(view: EditorView, event: MouseEvent): boolean {
+function handleClickWithPopover(
+    _view: EditorView,
+    event: MouseEvent,
+    popoverManager: PopoverManager,
+    allIssues: Issue[]
+): boolean {
     const target = event.target as HTMLElement;
 
-    // Use closest() to find lint-icon element (Requirement 8.3)
+    // Use closest() to find lint-icon element (Requirement 8.5)
     const icon = target.closest('.lint-icon') as IconDivElement | null;
     if (!icon) {
         return false;
     }
 
-    // Retrieve issue from icon element's attached data (Requirement 8.4)
-    const issue = icon.issue;
-    if (!issue) {
+    // Retrieve issue from icon element's attached data
+    const clickedIssue = icon.issue;
+    if (!clickedIssue) {
         return false;
     }
 
-    // Create TextSelection from issue.from/to and scroll into view (Requirement 8.1)
-    const { from, to } = issue;
-    const tr = view.state.tr.setSelection(
-        TextSelection.create(view.state.doc, from, to)
+    // Find all issues at the same position (Requirement 18.7 - multiple issues at same position)
+    const issuesAtPosition = allIssues.filter(
+        (issue) =>
+            issue.from === clickedIssue.from && issue.to === clickedIssue.to
     );
-    view.dispatch(tr.scrollIntoView());
+
+    // If no issues found at position, use the clicked issue
+    const issuesToShow =
+        issuesAtPosition.length > 0 ? issuesAtPosition : [clickedIssue];
+
+    // Show popover positioned near the icon (Requirements 8.1, 8.2)
+    popoverManager.show(issuesToShow, icon);
 
     return true;
 }
 
 /**
- * Handle double click on lint icons - execute fix function if present
+ * Legacy click handler - select the issue text range (used when popover is not configured)
  * @param view - The EditorView
  * @param event - The mouse event
  * @returns true if the click was handled, false otherwise
  */
-function handleDoubleClick(view: EditorView, event: MouseEvent): boolean {
+function handleClickLegacy(view: EditorView, event: MouseEvent): boolean {
     const target = event.target as HTMLElement;
 
-    // Use closest() to find lint-icon element (Requirement 8.3)
+    // Use closest() to find lint-icon element
     const icon = target.closest('.lint-icon') as IconDivElement | null;
     if (!icon) {
         return false;
     }
 
-    // Retrieve issue from icon element's attached data (Requirement 8.4)
+    // Retrieve issue from icon element's attached data
     const issue = icon.issue;
-    if (!issue || !issue.fix) {
+    if (!issue) {
         return false;
     }
 
-    // Execute fix function and focus editor (Requirement 8.2)
-    issue.fix(view, issue);
-    view.focus();
+    // Import TextSelection dynamically to avoid unused import when popover is used
+    const { TextSelection } = require('@tiptap/pm/state');
+
+    // Create TextSelection from issue.from/to and scroll into view
+    const { from, to } = issue;
+    const tr = view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, from, to)
+    );
+    view.dispatch(tr.scrollIntoView());
 
     return true;
 }
