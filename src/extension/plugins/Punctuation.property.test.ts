@@ -116,7 +116,9 @@ describe('Punctuation Property Tests', () => {
 
             // Apply the fix
             const { view, getResultText } = createMockEditorView(originalText);
-            results[0].fix!(view, results[0]);
+            if (results[0].fix) {
+                results[0].fix(view, results[0]);
+            }
 
             const resultText = getResultText();
 

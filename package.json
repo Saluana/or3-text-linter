@@ -48,7 +48,9 @@
         "prepublishOnly": "npm run build && npm test",
         "test": "vitest --run",
         "test:watch": "vitest",
-        "dev": "vite"
+        "dev": "vite",
+        "lint": "eslint . --max-warnings 0",
+        "lint:fix": "eslint . --fix"
     },
     "peerDependencies": {
         "@tiptap/core": "^2.1.0",
@@ -61,16 +63,19 @@
         }
     },
     "dependencies": {
-        "@tiptap/vue-3": "^2.1.0",
         "@tiptap/extension-document": "^2.1.0",
-        "@tiptap/extension-paragraph": "^2.1.0",
         "@tiptap/extension-heading": "^2.1.0",
-        "@tiptap/extension-text": "^2.1.0"
+        "@tiptap/extension-paragraph": "^2.1.0",
+        "@tiptap/extension-text": "^2.1.0",
+        "@tiptap/vue-3": "^2.1.0"
     },
     "devDependencies": {
         "@fast-check/vitest": "^0.2.3",
         "@types/bun": "latest",
+        "@typescript-eslint/eslint-plugin": "^8.48.1",
+        "@typescript-eslint/parser": "^8.48.1",
         "@vitejs/plugin-vue": "^5.0.0",
+        "eslint": "^9.39.1",
         "fast-check": "^3.0.0",
         "jsdom": "^27.2.0",
         "typescript": "^5.0.0",

@@ -8,7 +8,7 @@ import Paragraph from '@tiptap/extension-paragraph';
 import Text from '@tiptap/extension-text';
 import { PopoverManager } from './PopoverManager';
 import { defineComponent, h } from 'vue';
-import type { Issue, PopoverContext } from '../types';
+import type { Issue } from '../types';
 
 describe('PopoverManager Vue Component Tests', () => {
     let editor: Editor;
@@ -84,7 +84,7 @@ describe('PopoverManager Vue Component Tests', () => {
             },
             setup(props) {
                 return () => {
-                    const messages = props.issues?.map((i: any) => i.message);
+                    const messages = (props.issues as Issue[] | undefined)?.map((i) => i.message);
                     return h('div', { class: 'test-messages' }, messages?.join(', '));
                 };
             },

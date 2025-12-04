@@ -104,8 +104,9 @@ export function createNaturalLanguageRule(
                 // Call the AI provider with the system prompt and document content
                 // Requirement 16.2: Send rule description and document text to AI provider
                 // Requirement 17.5: Use system prompt that instructs AI to find violations
+                const prompt = this.config.systemPrompt || generateSystemPrompt(rule);
                 const response = await this.config.provider(
-                    this.config.systemPrompt!,
+                    prompt,
                     fullText
                 );
 

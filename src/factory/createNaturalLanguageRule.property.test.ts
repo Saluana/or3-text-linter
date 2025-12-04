@@ -55,9 +55,7 @@ const wordArb = fc
 /**
  * Generator for severity
  */
-const severityArb = fc.constantFrom('info', 'warning', 'error') as fc.Arbitrary<
-    'info' | 'warning' | 'error'
->;
+const severityArb: fc.Arbitrary<'info' | 'warning' | 'error'> = fc.constantFrom('info', 'warning', 'error');
 
 describe('createNaturalLanguageRule Property Tests', () => {
     // **Feature: tiptap-linter, Property 17: Natural Language Rule Factory Output**
@@ -256,7 +254,7 @@ describe('createNaturalLanguageRule Property Tests', () => {
             });
 
             // Scan all plugins
-            await Promise.all(plugins.map((p) => p.scan()));
+            await Promise.all(plugins.map(async (p) => await p.scan()));
 
             // Collect all issues
             const allIssues = plugins.flatMap((p) => p.getResults());
@@ -306,7 +304,7 @@ describe('createNaturalLanguageRule Property Tests', () => {
                 return new PluginClass(doc);
             });
 
-            await Promise.all(plugins.map((p) => p.scan()));
+            await Promise.all(plugins.map(async (p) => await p.scan()));
 
             const allIssues = plugins.flatMap((p) => p.getResults());
             const expectedTotal = issueCounts.reduce((sum, c) => sum + c, 0);

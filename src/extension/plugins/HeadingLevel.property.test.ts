@@ -180,7 +180,9 @@ describe('HeadingLevel Property Tests', () => {
             // Apply the fix
             const { view, getAppliedLevel, getAppliedPos } =
                 createMockEditorView();
-            results[0].fix!(view, results[0]);
+            if (results[0].fix) {
+                results[0].fix(view, results[0]);
+            }
 
             // Property: Fix SHALL set heading level to previous level + 1
             const expectedLevel = firstLevel + 1;

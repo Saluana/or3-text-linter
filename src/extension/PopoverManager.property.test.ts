@@ -9,6 +9,7 @@ import Paragraph from '@tiptap/extension-paragraph';
 import Text from '@tiptap/extension-text';
 import { PopoverManager, createDefaultPopover } from './PopoverManager';
 import type { Issue, Severity, PopoverContext, PopoverActions } from '../types';
+import type { EditorView } from '@tiptap/pm/view';
 
 // Generator for severity values
 const severityArb = fc.constantFrom(
@@ -309,7 +310,7 @@ describe('createDefaultPopover Property Tests', () => {
         };
 
         // Create a minimal mock view
-        const mockView = {} as any;
+        const mockView = {} as EditorView;
 
         const context: PopoverContext = {
             issues,
@@ -358,7 +359,7 @@ describe('createDefaultPopover Property Tests', () => {
                 dismiss: () => {},
             };
 
-            const mockView = {} as any;
+            const mockView = {} as EditorView;
 
             // Test issue without fix
             const issueWithoutFix: Issue = { ...issueInput };
