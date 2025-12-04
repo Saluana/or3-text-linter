@@ -49,6 +49,16 @@ export interface LinterStorage {
 
 /**
  * Run all linter plugins (sync and async) and create a DecorationSet
+ *
+ * This function handles both synchronous and asynchronous plugins:
+ * - Sync plugins: scan() returns `this`
+ * - Async plugins: scan() returns `Promise<this>`
+ *
+ * All plugins run concurrently using Promise.allSettled to ensure:
+ * - Editor remains responsive during async operations (Requirement 12.2)
+ * - Multiple async plugins run concurrently (Requirement 12.3)
+ * - Errors in one plugin don't affect others (Requirement 12.4)
+ *
  * @param doc - The ProseMirror document to scan
  * @param plugins - Array of plugin classes to run
  * @param view - The EditorView for creating decorations
@@ -59,33 +69,31 @@ export async function runAllLinterPlugins(
     plugins: Array<LinterPluginClass | AsyncLinterPluginClass>,
     _view: EditorView
 ): Promise<{ decorations: DecorationSet; issues: Issue[] }> {
-    const allIssues: Issue[] = [];
-
-    // Run all plugins and collect issues
+    // Run all plugins concurrently (Requirement 12.3)
+    // Each plugin is wrapped in its own async function to handle both sync and async scan()
     const pluginPromises = plugins.map(async (PluginClass) => {
-        try {
-            const plugin = new PluginClass(doc);
-            const result = plugin.scan();
+        const plugin = new PluginClass(doc);
+        const result = plugin.scan();
 
-            // Handle both sync and async returns
-            if (result instanceof Promise) {
-                await result;
-            }
-
-            return plugin.getResults();
-        } catch (error) {
-            console.error(`Linter plugin ${PluginClass.name} failed:`, error);
-            return [];
+        // Detect if scan() returns Promise and await it (Requirement 12.1)
+        if (result instanceof Promise) {
+            await result;
         }
+
+        return plugin.getResults();
     });
 
-    // Wait for all plugins to complete
+    // Use Promise.allSettled to catch errors and continue with other plugins (Requirement 12.4)
     const results = await Promise.allSettled(pluginPromises);
 
-    // Collect issues from successful plugins
+    // Merge sync and async results, collecting issues from successful plugins only
+    const allIssues: Issue[] = [];
     for (const result of results) {
         if (result.status === 'fulfilled') {
             allIssues.push(...result.value);
+        } else {
+            // Log errors but continue processing (Requirement 12.4)
+            console.error('Linter plugin failed:', result.reason);
         }
     }
 

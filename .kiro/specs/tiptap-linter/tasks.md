@@ -128,50 +128,50 @@
 
     -   Ensure all tests pass, ask the user if questions arise.
 
--   [ ] 9. Async plugin support
+-   [x] 9. Async plugin support
 
-    -   [ ] 9.1 Update runAllLinterPlugins for async support
+    -   [x] 9.1 Update runAllLinterPlugins for async support
         -   Detect if scan() returns Promise
         -   Use Promise.allSettled for concurrent execution
         -   Catch errors and continue with other plugins
         -   Merge sync and async results
         -   _Requirements: 12.1, 12.2, 12.3, 12.4_
-    -   [ ] 9.2 Write property test for async plugin awaiting
+    -   [x] 9.2 Write property test for async plugin awaiting
         -   **Property 11: Async Plugin Awaiting**
         -   **Validates: Requirements 12.1**
-    -   [ ] 9.3 Write property test for async error isolation
+    -   [x] 9.3 Write property test for async error isolation
         -   **Property 12: Async Plugin Error Isolation**
         -   **Validates: Requirements 12.4**
 
--   [ ] 10. AILinterPlugin base class
+-   [x] 10. AILinterPlugin base class
 
-    -   [ ] 10.1 Define AI types and interfaces
+    -   [x] 10.1 Define AI types and interfaces
         -   Define AIProviderFn type
         -   Define AIResponse interface
         -   Define AILinterPluginConfig interface
         -   _Requirements: 13.1, 14.1, 14.2, 14.3, 14.4_
-    -   [ ] 10.2 Implement AILinterPlugin base class
+    -   [x] 10.2 Implement AILinterPlugin base class
         -   Extend LinterPlugin
         -   Constructor accepts config with provider
         -   Implement extractTextWithPositions() for text extraction
         -   Build position map from text offsets to ProseMirror positions
         -   _Requirements: 13.2_
-    -   [ ] 10.3 Implement AI response parsing helpers
+    -   [x] 10.3 Implement AI response parsing helpers
         -   Implement parseAIResponse() with error handling
         -   Implement findTextPosition() to locate text in document
         -   Implement createTextFix() for replacement fixes
         -   Handle malformed responses gracefully
         -   _Requirements: 13.3, 15.1, 15.2, 15.3, 15.4_
-    -   [ ] 10.4 Write property test for text extraction position mapping
+    -   [x] 10.4 Write property test for text extraction position mapping
         -   **Property 13: AI Text Extraction Position Mapping**
         -   **Validates: Requirements 13.2, 15.2**
-    -   [ ] 10.5 Write property test for AI response conversion
+    -   [x] 10.5 Write property test for AI response conversion
         -   **Property 14: AI Response to Issue Conversion**
         -   **Validates: Requirements 13.3, 15.1, 16.3**
-    -   [ ] 10.6 Write property test for AI fix function creation
+    -   [x] 10.6 Write property test for AI fix function creation
         -   **Property 15: AI Fix Function Creation**
         -   **Validates: Requirements 15.3, 16.4**
-    -   [ ] 10.7 Write property test for malformed response handling
+    -   [x] 10.7 Write property test for malformed response handling
         -   **Property 16: AI Response Malformed Handling**
         -   **Validates: Requirements 15.4**
 

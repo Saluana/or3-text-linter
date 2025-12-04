@@ -251,3 +251,314 @@ describe('Linter DecorationSet Property Tests', () => {
         }
     );
 });
+
+// Factory to create an async test plugin class with specific issues and delay
+function createAsyncTestPluginClass(
+    issues: Array<{
+        message: string;
+        from: number;
+        to: number;
+        severity: Severity;
+    }>,
+    delayMs: number = 10
+) {
+    return class extends LinterPlugin {
+        async scan(): Promise<this> {
+            // Simulate async operation (e.g., AI API call)
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            for (const issue of issues) {
+                this.record(
+                    issue.message,
+                    issue.from,
+                    issue.to,
+                    issue.severity
+                );
+            }
+            return this;
+        }
+    };
+}
+
+// Factory to create a plugin that throws an error
+function createFailingPluginClass(errorMessage: string) {
+    return class extends LinterPlugin {
+        scan(): this {
+            throw new Error(errorMessage);
+        }
+    };
+}
+
+// Factory to create an async plugin that throws an error
+function createAsyncFailingPluginClass(
+    errorMessage: string,
+    delayMs: number = 5
+) {
+    return class extends LinterPlugin {
+        async scan(): Promise<this> {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            throw new Error(errorMessage);
+        }
+    };
+}
+
+describe('Linter Async Plugin Property Tests', () => {
+    // **Feature: tiptap-linter, Property 11: Async Plugin Awaiting**
+    // **Validates: Requirements 12.1**
+    // Direct test of runAllLinterPlugins for async behavior
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 5 }
+            ),
+        ],
+        { numRuns: 100 }
+    )(
+        'runAllLinterPlugins awaits async plugins and includes their issues',
+        async (issueInputs) => {
+            // Import runAllLinterPlugins for direct testing
+            const { runAllLinterPlugins } = await import('./Linter');
+
+            // Convert inputs to valid issues with proper positions
+            const issues = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const AsyncTestPluginClass = createAsyncTestPluginClass(issues, 10);
+
+            // Create a minimal editor just to get a doc
+            const editor = new Editor({
+                extensions: [Document, Paragraph, Text],
+                content: '<p>Test content for async plugin testing.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Call runAllLinterPlugins directly
+            const result = await runAllLinterPlugins(
+                editor.state.doc,
+                [AsyncTestPluginClass],
+                editor.view
+            );
+
+            // Property: All async plugin issues should be included
+            expect(result.issues).toHaveLength(issues.length);
+
+            for (let i = 0; i < issues.length; i++) {
+                expect(result.issues[i].message).toBe(issues[i].message);
+                expect(result.issues[i].severity).toBe(issues[i].severity);
+            }
+
+            editor.destroy();
+        }
+    );
+});
+
+describe('Linter Error Isolation Property Tests', () => {
+    // **Feature: tiptap-linter, Property 12: Async Plugin Error Isolation**
+    // **Validates: Requirements 12.4**
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 5 }
+            ),
+            fc.string({ minLength: 1, maxLength: 20 }), // error message
+        ],
+        { numRuns: 100 }
+    )(
+        'failing plugin does not prevent other plugins from reporting issues',
+        async (issueInputs, errorMessage) => {
+            const { runAllLinterPlugins } = await import('./Linter');
+
+            // Convert inputs to valid issues with proper positions
+            const issues = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const WorkingPluginClass = createTestPluginClass(issues);
+            const FailingPluginClass = createFailingPluginClass(errorMessage);
+
+            // Create a minimal editor just to get a doc
+            const editor = new Editor({
+                extensions: [Document, Paragraph, Text],
+                content: '<p>Test content for error isolation testing.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Call runAllLinterPlugins with both working and failing plugins
+            const result = await runAllLinterPlugins(
+                editor.state.doc,
+                [FailingPluginClass, WorkingPluginClass],
+                editor.view
+            );
+
+            // Property: Issues from working plugin should still be collected
+            expect(result.issues).toHaveLength(issues.length);
+
+            for (let i = 0; i < issues.length; i++) {
+                expect(result.issues[i].message).toBe(issues[i].message);
+                expect(result.issues[i].severity).toBe(issues[i].severity);
+            }
+
+            editor.destroy();
+        }
+    );
+
+    // Test async plugin error isolation
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 5 }
+            ),
+            fc.string({ minLength: 1, maxLength: 20 }), // error message
+        ],
+        { numRuns: 100 }
+    )(
+        'async failing plugin does not prevent other plugins from reporting issues',
+        async (issueInputs, errorMessage) => {
+            const { runAllLinterPlugins } = await import('./Linter');
+
+            // Convert inputs to valid issues with proper positions
+            const issues = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const WorkingAsyncPluginClass = createAsyncTestPluginClass(
+                issues,
+                10
+            );
+            const FailingAsyncPluginClass = createAsyncFailingPluginClass(
+                errorMessage,
+                5
+            );
+
+            // Create a minimal editor just to get a doc
+            const editor = new Editor({
+                extensions: [Document, Paragraph, Text],
+                content:
+                    '<p>Test content for async error isolation testing.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Call runAllLinterPlugins with both working and failing async plugins
+            const result = await runAllLinterPlugins(
+                editor.state.doc,
+                [FailingAsyncPluginClass, WorkingAsyncPluginClass],
+                editor.view
+            );
+
+            // Property: Issues from working async plugin should still be collected
+            expect(result.issues).toHaveLength(issues.length);
+
+            for (let i = 0; i < issues.length; i++) {
+                expect(result.issues[i].message).toBe(issues[i].message);
+                expect(result.issues[i].severity).toBe(issues[i].severity);
+            }
+
+            editor.destroy();
+        }
+    );
+
+    // Test mixed sync/async plugins with one failing
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 3 }
+            ),
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 3 }
+            ),
+            fc.string({ minLength: 1, maxLength: 20 }), // error message
+        ],
+        { numRuns: 100 }
+    )(
+        'mixed sync/async plugins with failing plugin still collect all working issues',
+        async (syncIssueInputs, asyncIssueInputs, errorMessage) => {
+            const { runAllLinterPlugins } = await import('./Linter');
+
+            // Convert inputs to valid issues with proper positions
+            const syncIssues = syncIssueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const asyncIssues = asyncIssueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 20 + idx, // Different positions to avoid overlap
+                to: 20 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const SyncPluginClass = createTestPluginClass(syncIssues);
+            const AsyncPluginClass = createAsyncTestPluginClass(
+                asyncIssues,
+                10
+            );
+            const FailingPluginClass = createFailingPluginClass(errorMessage);
+
+            // Create a minimal editor just to get a doc
+            const editor = new Editor({
+                extensions: [Document, Paragraph, Text],
+                content:
+                    '<p>Test content for mixed plugin error isolation testing with enough length.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Call runAllLinterPlugins with sync, async, and failing plugins
+            const result = await runAllLinterPlugins(
+                editor.state.doc,
+                [SyncPluginClass, FailingPluginClass, AsyncPluginClass],
+                editor.view
+            );
+
+            // Property: Issues from both working sync and async plugins should be collected
+            const expectedTotalIssues = syncIssues.length + asyncIssues.length;
+            expect(result.issues).toHaveLength(expectedTotalIssues);
+
+            editor.destroy();
+        }
+    );
+});
