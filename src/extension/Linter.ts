@@ -303,10 +303,11 @@ function handleClickWithPopover(
     const target = event.target as HTMLElement;
 
     // Use closest() to find lint-icon element (Requirement 8.5)
-    const icon = target.closest('.lint-icon') as IconDivElement;
-    if (!icon) {
+    const element = target.closest('.lint-icon');
+    if (!element) {
         return false;
     }
+    const icon = element as IconDivElement;
 
     // Retrieve issue from icon element's attached data
     const clickedIssue = icon.issue;
@@ -340,10 +341,11 @@ function handleClickLegacy(view: EditorView, event: MouseEvent): boolean {
     const target = event.target as HTMLElement;
 
     // Use closest() to find lint-icon element
-    const icon = target.closest('.lint-icon') as IconDivElement;
-    if (!icon) {
+    const element = target.closest('.lint-icon');
+    if (!element) {
         return false;
     }
+    const icon = element as IconDivElement;
 
     // Retrieve issue from icon element's attached data
     const issue = icon.issue;

@@ -11,6 +11,8 @@ export default [
             '*.config.js',
             '*.config.ts',
             'coverage/**',
+            '*.min.js',
+            'vendor/**',
         ],
     },
     {
