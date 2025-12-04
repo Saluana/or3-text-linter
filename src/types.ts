@@ -1,5 +1,6 @@
 import type { EditorView } from '@tiptap/pm/view';
 import type { Node as ProsemirrorNode } from '@tiptap/pm/model';
+import type { Component } from 'vue';
 
 // Forward declaration for Issue (defined below)
 // This is needed for PopoverActions which references Issue
@@ -174,6 +175,17 @@ export interface PopoverContext {
 export type PopoverRenderer = (context: PopoverContext) => HTMLElement;
 
 /**
+ * Vue component configuration for popover content.
+ * Provides a declarative way to render Vue components in popovers.
+ */
+export interface VuePopoverComponent {
+    /** The Vue component to render */
+    component: Component;
+    /** Optional props to pass to the component (in addition to context) */
+    props?: Record<string, any>;
+}
+
+/**
  * Popover positioning options relative to the lint icon.
  *
  * Requirement: 18.6
@@ -215,8 +227,20 @@ export interface PopoverOptions {
      * Custom renderer function for the popover content.
      * If not provided, a default popover will be used.
      * Requirement: 18.1
+     * 
+     * Note: Cannot be used together with `vueComponent`.
      */
     renderer?: PopoverRenderer;
+
+    /**
+     * Vue component configuration for popover content.
+     * When provided, a Vue component will be rendered instead of using the renderer.
+     * The component receives the PopoverContext as props and can access popover actions
+     * via Vue's inject API using the 'popoverActions' key.
+     * 
+     * Note: Cannot be used together with `renderer`.
+     */
+    vueComponent?: VuePopoverComponent;
 
     /**
      * Popover placement relative to the lint icon.
