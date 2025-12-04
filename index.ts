@@ -34,6 +34,7 @@ export type {
     PopoverPlacement,
     PopoverStyle,
     PopoverOptions,
+    VuePopoverComponent,
 } from './src/types';
 
 // ============================================================================
@@ -82,6 +83,11 @@ export {
     PopoverManager,
     createDefaultPopover,
 } from './src/extension/PopoverManager';
+
+export {
+    usePopoverActions,
+    usePopoverContext,
+} from './src/extension/usePopover';
 
 // ============================================================================
 // Built-in Plugins

@@ -6,6 +6,7 @@ import type {
     PopoverContext,
     PopoverPlacement,
 } from '../types';
+import { createApp, type App } from 'vue';
 
 /**
  * Default popover renderer that creates a standard popover UI
@@ -66,6 +67,7 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
  */
 export class PopoverManager {
     private popoverEl: HTMLElement | null = null;
+    private vueApp: App | null = null;
     private view: EditorView;
     private options: PopoverOptions;
     private boundHandleClickOutside: (event: MouseEvent) => void;
@@ -104,9 +106,15 @@ export class PopoverManager {
             view: this.view,
         };
 
-        // Use custom renderer or default
-        const renderer = this.options.renderer ?? createDefaultPopover;
-        this.popoverEl = renderer(context);
+        // Check if Vue component is provided
+        if (this.options.vueComponent) {
+            this.popoverEl = this.renderVueComponent(context);
+        } else {
+            // Use custom renderer or default
+            const renderer = this.options.renderer ?? createDefaultPopover;
+            this.popoverEl = renderer(context);
+        }
+        
         this.popoverEl.classList.add('lint-popover-container');
 
         // Apply custom styles if provided
@@ -134,6 +142,12 @@ export class PopoverManager {
      * Hide and remove the popover from the DOM.
      */
     hide(): void {
+        // Unmount Vue app if it exists
+        if (this.vueApp) {
+            this.vueApp.unmount();
+            this.vueApp = null;
+        }
+        
         if (this.popoverEl) {
             this.popoverEl.remove();
             this.popoverEl = null;
@@ -146,6 +160,39 @@ export class PopoverManager {
      */
     isVisible(): boolean {
         return this.popoverEl !== null;
+    }
+
+    /**
+     * Render a Vue component as popover content.
+     * Creates a Vue app instance and provides the popover actions via injection.
+     *
+     * @param context - The popover context with issues, actions, and view
+     * @returns HTMLElement containing the mounted Vue component
+     */
+    private renderVueComponent(context: PopoverContext): HTMLElement {
+        const container = document.createElement('div');
+        
+        if (!this.options.vueComponent) {
+            return container;
+        }
+
+        const { component, props = {} } = this.options.vueComponent;
+
+        // Create Vue app with the component
+        this.vueApp = createApp(component, {
+            ...props,
+            issues: context.issues,
+            view: context.view,
+        });
+
+        // Provide popover actions for injection in child components
+        this.vueApp.provide('popoverActions', context.actions);
+        this.vueApp.provide('popoverContext', context);
+
+        // Mount the app
+        this.vueApp.mount(container);
+
+        return container;
     }
 
     /**

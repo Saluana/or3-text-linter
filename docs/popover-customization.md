@@ -7,6 +7,7 @@ This guide covers how to customize the popover UI that appears when users click 
 -   [Overview](#overview)
 -   [Default Popover Configuration](#default-popover-configuration)
 -   [Styling the Default Popover](#styling-the-default-popover)
+-   [Using Vue Components](#using-vue-components)
 -   [Creating a Custom Renderer](#creating-a-custom-renderer)
 -   [Popover Actions API](#popover-actions-api)
 -   [Positioning Options](#positioning-options)
@@ -24,7 +25,7 @@ You can customize:
 
 -   **Placement** - Where the popover appears relative to the icon
 -   **Styling** - Colors, borders, shadows, etc.
--   **Content** - Completely custom UI with your own renderer
+-   **Content** - Completely custom UI with Vue components or custom renderers
 
 ## Default Popover Configuration
 
@@ -182,6 +183,380 @@ The default popover uses these CSS classes:
     }
 }
 ```
+
+## Using Vue Components
+
+**⭐ Recommended Approach for Vue Projects**
+
+The easiest and most powerful way to customize popovers in Vue applications is to use Vue components. This approach provides excellent DX with type-safe props, reactive state, scoped styles, and clean access to popover actions.
+
+### Basic Vue Component Popover
+
+```typescript
+import { Linter, BadWords } from 'tiptap-linter';
+import IssuePopover from './components/IssuePopover.vue';
+
+Linter.configure({
+    plugins: [BadWords],
+    popover: {
+        vueComponent: {
+            component: IssuePopover,
+        },
+        placement: 'bottom',
+    },
+});
+```
+
+### Example Vue Component
+
+Create a Vue component that receives issues as props and uses the composable for actions:
+
+```vue
+<script setup lang="ts">
+import { usePopoverActions } from 'tiptap-linter';
+import type { Issue } from 'tiptap-linter';
+
+// Props automatically passed by PopoverManager
+defineProps<{
+    issues: Issue[];
+}>();
+
+// Access popover actions via composable
+const actions = usePopoverActions();
+</script>
+
+<template>
+    <div class="issue-popover">
+        <div
+            v-for="(issue, index) in issues"
+            :key="index"
+            :class="`issue issue--${issue.severity}`"
+        >
+            <span class="severity-badge">{{ issue.severity }}</span>
+            <p class="message">{{ issue.message }}</p>
+
+            <div class="actions">
+                <button
+                    v-if="issue.fix"
+                    class="btn-fix"
+                    @click="actions.applyFix()"
+                >
+                    Fix
+                </button>
+                <button class="btn-dismiss" @click="actions.dismiss()">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style scoped>
+.issue-popover {
+    padding: 12px;
+}
+
+.severity-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.issue--error .severity-badge {
+    background: #fee;
+    color: #c00;
+}
+
+.issue--warning .severity-badge {
+    background: #ffeaa7;
+    color: #d97706;
+}
+
+.issue--info .severity-badge {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+button {
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-fix {
+    background: #3b82f6;
+    color: white;
+    border: none;
+}
+
+.btn-dismiss {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+}
+</style>
+```
+
+### Using Popover Composables
+
+The library provides two composables for accessing popover functionality within your Vue components:
+
+#### `usePopoverActions()`
+
+Access the actions API to interact with the editor:
+
+```vue
+<script setup lang="ts">
+import { usePopoverActions } from 'tiptap-linter';
+
+const actions = usePopoverActions();
+
+function handleFix() {
+    actions.applyFix();
+}
+
+function handleDelete() {
+    actions.deleteText();
+}
+
+function handleReplace(newText: string) {
+    actions.replaceText(newText);
+}
+
+function handleDismiss() {
+    actions.dismiss();
+}
+</script>
+```
+
+#### `usePopoverContext()`
+
+Access the full popover context including issues, actions, and editor view:
+
+```vue
+<script setup lang="ts">
+import { usePopoverContext } from 'tiptap-linter';
+
+const { issues, actions, view } = usePopoverContext();
+
+// Access editor state
+const docText = view.state.doc.textContent;
+</script>
+```
+
+### Passing Additional Props
+
+You can pass custom props to your Vue component:
+
+```typescript
+Linter.configure({
+    plugins: [BadWords],
+    popover: {
+        vueComponent: {
+            component: IssuePopover,
+            props: {
+                theme: 'dark',
+                showDetails: true,
+                customTitle: 'Lint Issues',
+            },
+        },
+    },
+});
+```
+
+Access them in your component:
+
+```vue
+<script setup lang="ts">
+import type { Issue } from 'tiptap-linter';
+
+interface Props {
+    issues: Issue[];
+    theme?: string;
+    showDetails?: boolean;
+    customTitle?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    theme: 'light',
+    showDetails: false,
+    customTitle: 'Issues',
+});
+</script>
+
+<template>
+    <div :class="`popover popover--${props.theme}`">
+        <h3>{{ props.customTitle }}</h3>
+        <!-- ... rest of template -->
+    </div>
+</template>
+```
+
+### Advanced Vue Component Example
+
+Here's a more advanced example with input for text replacement:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { usePopoverActions } from 'tiptap-linter';
+import type { Issue } from 'tiptap-linter';
+
+defineProps<{
+    issues: Issue[];
+}>();
+
+const actions = usePopoverActions();
+const replacementText = ref('');
+
+function handleReplace() {
+    if (replacementText.value.trim()) {
+        actions.replaceText(replacementText.value);
+    }
+}
+</script>
+
+<template>
+    <div class="advanced-popover">
+        <div v-for="(issue, index) in issues" :key="index" class="issue">
+            <h4 class="issue-title">{{ issue.severity.toUpperCase() }}</h4>
+            <p class="issue-message">{{ issue.message }}</p>
+
+            <div class="replacement-form">
+                <input
+                    v-model="replacementText"
+                    type="text"
+                    placeholder="Enter replacement text"
+                    class="replacement-input"
+                    @keyup.enter="handleReplace"
+                />
+                <div class="action-buttons">
+                    <button
+                        v-if="issue.fix"
+                        class="btn btn-fix"
+                        @click="actions.applyFix()"
+                    >
+                        🔧 Auto-fix
+                    </button>
+                    <button
+                        class="btn btn-replace"
+                        :disabled="!replacementText.trim()"
+                        @click="handleReplace"
+                    >
+                        ✏️ Replace
+                    </button>
+                    <button
+                        class="btn btn-delete"
+                        @click="actions.deleteText()"
+                    >
+                        🗑️ Delete
+                    </button>
+                    <button
+                        class="btn btn-dismiss"
+                        @click="actions.dismiss()"
+                    >
+                        ✕ Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style scoped>
+.advanced-popover {
+    min-width: 300px;
+}
+
+.issue {
+    padding: 12px;
+}
+
+.issue-title {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+.issue-message {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.replacement-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.replacement-input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-fix {
+    background: #10b981;
+    color: white;
+}
+
+.btn-replace {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-delete {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-dismiss {
+    background: #6b7280;
+    color: white;
+}
+</style>
+```
+
+### Benefits of Vue Components
+
+-   ✅ **Type Safety**: Full TypeScript support with typed props
+-   ✅ **Reactivity**: Automatic reactive updates with Vue's reactivity system
+-   ✅ **Scoped Styles**: CSS scoped to your component automatically
+-   ✅ **Clean API**: Access actions via simple composables
+-   ✅ **Testability**: Easy to test Vue components in isolation
+-   ✅ **Reusability**: Share components across your application
+-   ✅ **Developer Experience**: Use Vue devtools for debugging
 
 ## Creating a Custom Renderer
 
