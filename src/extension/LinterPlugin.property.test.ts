@@ -31,9 +31,7 @@ class TestLinterPlugin extends LinterPlugin {
 }
 
 // Generator for severity values
-const severityArb = fc.constantFrom('info', 'warning', 'error') as fc.Arbitrary<
-    'info' | 'warning' | 'error'
->;
+const severityArb: fc.Arbitrary<'info' | 'warning' | 'error'> = fc.constantFrom('info', 'warning', 'error');
 
 // Generator for a single issue record input
 const issueInputArb = fc.record({

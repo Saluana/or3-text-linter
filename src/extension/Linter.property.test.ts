@@ -866,8 +866,11 @@ describe('Custom Popover Renderer Property Tests', () => {
                 // Property: Custom renderer should have been called with correct context
                 expect(receivedContext).not.toBeNull();
 
-                // Use non-null assertion since we just checked it's not null
-                const ctx = receivedContext!;
+                // Use type guard instead of non-null assertion
+                if (!receivedContext) {
+                    throw new Error('Expected receivedContext to not be null');
+                }
+                const ctx = receivedContext;
 
                 // Property: Context should contain the correct issues array (Requirement 18.2)
                 expect(ctx.issues).toHaveLength(issues.length);
@@ -991,8 +994,11 @@ describe('Custom Popover Renderer Property Tests', () => {
                 // Property: Actions should be captured
                 expect(capturedActions).not.toBeNull();
 
-                // Use non-null assertion since we just checked it's not null
-                const actions = capturedActions!;
+                // Use type guard instead of non-null assertion
+                if (!capturedActions) {
+                    throw new Error('Expected capturedActions to not be null');
+                }
+                const actions = capturedActions;
 
                 // Get initial content
                 const initialContent = editor.state.doc.textContent;

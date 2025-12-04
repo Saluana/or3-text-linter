@@ -182,7 +182,7 @@ export interface VuePopoverComponent {
     /** The Vue component to render */
     component: Component;
     /** Optional props to pass to the component (in addition to context) */
-    props?: Record<string, any>;
+    props?: Record<string, unknown>;
 }
 
 /**

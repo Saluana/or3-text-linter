@@ -36,7 +36,7 @@ describe('usePopover Composables Tests', () => {
     });
 
     it('usePopoverActions provides access to actions within Vue component', async () => {
-        let capturedActions: any = null;
+        let capturedActions: ReturnType<typeof usePopoverActions> | null = null;
 
         const TestComponent = defineComponent({
             props: {
@@ -74,7 +74,7 @@ describe('usePopover Composables Tests', () => {
     });
 
     it('usePopoverContext provides access to full context within Vue component', async () => {
-        let capturedContext: any = null;
+        let capturedContext: ReturnType<typeof usePopoverContext> | null = null;
 
         const TestComponent = defineComponent({
             props: {

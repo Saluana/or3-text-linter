@@ -321,10 +321,44 @@ Add these styles to customize the appearance:
 -   [API Reference](./docs/api-reference.md) - Complete API documentation
 -   [Popover Customization](./docs/popover-customization.md) - Custom UI guide
 
+## Development
+
+### Prerequisites
+
+- Node.js 18+ or Bun
+- npm, yarn, or bun package manager
+
+### Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Run linter
+npm run lint
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+```
+
+### Code Quality
+
+This project maintains strict code quality standards:
+
+- **TypeScript strict mode** enabled for maximum type safety
+- **ESLint** with zero-warnings policy - all code must pass linting
+- **No `any` types** - explicit typing required throughout the codebase
+- **Property-based testing** with fast-check for robust test coverage
+
+Run `npm run lint` before committing to ensure your code meets quality standards.
+
 ## License
 
 MIT
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting a PR.
+Contributions are welcome! Please read our [contributing guidelines](./CONTRIBUTING.md) before submitting a PR.
