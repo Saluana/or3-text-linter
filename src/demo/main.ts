@@ -1,4 +1,4 @@
 import { createApp } from 'vue';
-import LinterDemo from './LinterDemo.vue';
+import App from './App.vue';
 
-createApp(LinterDemo).mount('#app');
+createApp(App).mount('#app');

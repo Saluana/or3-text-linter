@@ -106,7 +106,7 @@ export class PopoverManager {
             view: this.view,
         };
 
-        // Check if Vue component is provided
+        // Check if Vue component is provided (takes precedence over renderer)
         if (this.options.vueComponent) {
             this.popoverEl = this.renderVueComponent(context);
         } else {
@@ -179,6 +179,8 @@ export class PopoverManager {
         const { component, props = {} } = this.options.vueComponent;
 
         // Create Vue app with the component
+        // Note: 'issues' and 'view' props are always set from context and will
+        // override any custom props with the same names
         this.vueApp = createApp(component, {
             ...props,
             issues: context.issues,
