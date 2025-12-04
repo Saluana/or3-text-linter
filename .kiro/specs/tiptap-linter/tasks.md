@@ -18,58 +18,58 @@
         -   **Property 20: Default Severity**
         -   **Validates: Requirements 2.4**
 
--   [ ] 2. Base LinterPlugin class
+-   [x] 2. Base LinterPlugin class
 
-    -   [ ] 2.1 Implement LinterPlugin base class
+    -   [x] 2.1 Implement LinterPlugin base class
         -   Constructor accepts typed ProsemirrorNode
         -   Implement record() method with default severity 'warning'
         -   Implement scan() returning this for chaining
         -   Implement getResults() returning Issue array
         -   _Requirements: 3.1, 3.2, 3.3, 3.4_
-    -   [ ] 2.2 Write property test for record/getResults round-trip
+    -   [x] 2.2 Write property test for record/getResults round-trip
         -   **Property 2: Record/GetResults Round-Trip**
         -   **Validates: Requirements 3.3, 3.4**
 
--   [ ] 3. BadWords plugin with all-matches fix
+-   [x] 3. BadWords plugin with all-matches fix
 
-    -   [ ] 3.1 Implement BadWords plugin
+    -   [x] 3.1 Implement BadWords plugin
         -   Extend LinterPlugin
         -   Define regex for bad words (obviously, clearly, evidently, simply)
         -   Implement scan() that iterates ALL matches using while loop with lastIndex reset
         -   Record issue for each match with word in message
         -   _Requirements: 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
-    -   [ ] 3.2 Write property test for all-matches detection
+    -   [x] 3.2 Write property test for all-matches detection
         -   **Property 1: Regex All-Matches Detection**
         -   **Validates: Requirements 4.1, 4.3, 5.3**
-    -   [ ] 3.3 Write property test for BadWords message content
+    -   [x] 3.3 Write property test for BadWords message content
         -   **Property 7: BadWords Detection with Message**
         -   **Validates: Requirements 5.1, 5.2**
 
--   [ ] 4. Punctuation plugin with fix function
+-   [x] 4. Punctuation plugin with fix function
 
-    -   [ ] 4.1 Implement Punctuation plugin
+    -   [x] 4.1 Implement Punctuation plugin
         -   Extend LinterPlugin
         -   Define regex for space before punctuation
         -   Implement scan() with all-matches iteration
         -   Create fix function that replaces with correct spacing
         -   _Requirements: 6.1, 6.2, 6.3, 6.4_
-    -   [ ] 4.2 Write property test for Punctuation fix round-trip
+    -   [x] 4.2 Write property test for Punctuation fix round-trip
         -   **Property 8: Punctuation Fix Round-Trip**
         -   **Validates: Requirements 6.1, 6.2, 6.3**
 
--   [ ] 5. HeadingLevel plugin with fix function
+-   [x] 5. HeadingLevel plugin with fix function
 
-    -   [ ] 5.1 Implement HeadingLevel plugin
+    -   [x] 5.1 Implement HeadingLevel plugin
         -   Extend LinterPlugin
         -   Track last heading level during scan
         -   Detect level jumps > 1
         -   Store node position for fix function
         -   Create fix function using setNodeMarkup
         -   _Requirements: 7.1, 7.2, 7.3, 7.4_
-    -   [ ] 5.2 Write property test for HeadingLevel detection
+    -   [x] 5.2 Write property test for HeadingLevel detection
         -   **Property 9: HeadingLevel Detection**
         -   **Validates: Requirements 7.2**
-    -   [ ] 5.3 Write property test for HeadingLevel fix round-trip
+    -   [x] 5.3 Write property test for HeadingLevel fix round-trip
         -   **Property 10: HeadingLevel Fix Round-Trip**
         -   **Validates: Requirements 7.3, 7.4**
 
