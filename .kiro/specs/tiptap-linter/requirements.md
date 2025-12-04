@@ -13,6 +13,8 @@ This feature implements an improved Tiptap/ProseMirror linter extension that add
 -   **DecorationSet**: ProseMirror collection of decorations applied to the document view
 -   **Fix Function**: A callback that applies an automatic correction for a detected issue
 -   **Severity**: Classification of issue importance (info, warning, error)
+-   **Popover**: A floating UI element that appears when clicking the lint icon, displaying issue details and actions
+-   **PopoverRenderer**: A user-provided function that renders custom popover content
 
 ## Requirements
 
@@ -94,14 +96,15 @@ This feature implements an improved Tiptap/ProseMirror linter extension that add
 
 ### Requirement 8: Click Interaction Handling
 
-**User Story:** As an editor user, I want to click lint icons to select problem text and double-click to auto-fix, so that I can quickly address issues.
+**User Story:** As an editor user, I want to click lint icons to see issue details in a popover, so that I can understand and address issues without disrupting my editing flow.
 
 #### Acceptance Criteria
 
-1. WHEN a user clicks a lint icon THEN the Linter extension SHALL select the issue text range and scroll it into view
-2. WHEN a user double-clicks a lint icon with a fix function THEN the Linter extension SHALL execute the fix and focus the editor
-3. WHEN detecting click targets THEN the Linter extension SHALL use closest traversal to find the lint icon element
-4. WHEN a lint icon is clicked THEN the Linter extension SHALL retrieve the issue from the icon element's attached data
+1. WHEN a user clicks a lint icon THEN the Linter extension SHALL display a popover positioned near the icon
+2. WHEN a popover is displayed THEN the Linter extension SHALL show the issue message and severity by default
+3. WHEN an issue has a fix function THEN the popover SHALL display an action to apply the fix
+4. WHEN a user clicks outside the popover or presses Escape THEN the Linter extension SHALL close the popover
+5. WHEN detecting click targets THEN the Linter extension SHALL use closest traversal to find the lint icon element
 
 ### Requirement 9: Severity-Based Styling
 
@@ -111,7 +114,8 @@ This feature implements an improved Tiptap/ProseMirror linter extension that add
 
 1. WHEN rendering inline decorations THEN the Linter extension SHALL apply CSS classes based on issue severity (problem--info, problem--warning, problem--error)
 2. WHEN rendering widget icons THEN the Linter extension SHALL apply CSS classes based on issue severity
-3. WHEN styling is applied THEN the CSS SHALL provide distinct visual appearance for each severity level
+3. WHEN rendering the popover THEN the Linter extension SHALL apply CSS classes based on issue severity
+4. WHEN styling is applied THEN the CSS SHALL provide distinct visual appearance for each severity level
 
 ### Requirement 10: Issues Storage API
 
@@ -201,3 +205,29 @@ This feature implements an improved Tiptap/ProseMirror linter extension that add
 3. WHEN createNaturalLanguageRule is called THEN the developer MAY provide optional severity level for issues found by this rule
 4. WHEN createNaturalLanguageRule is called THEN the developer MAY provide optional debounce timing for the rule
 5. WHEN the created plugin scans THEN the plugin SHALL use a system prompt that instructs the AI to find violations of the natural language rule and return structured issue data
+
+### Requirement 18: Customizable Popover System
+
+**User Story:** As a developer, I want a fully customizable popover system for lint issues, so that I can tailor the UI to match my application's design and provide custom actions.
+
+#### Acceptance Criteria
+
+1. WHEN configuring the Linter extension THEN the developer MAY provide a custom popover renderer function
+2. WHEN a custom renderer is provided THEN the Linter extension SHALL call the renderer with issue data and action callbacks
+3. WHEN no custom renderer is provided THEN the Linter extension SHALL use a default popover displaying message, severity, and fix button
+4. WHEN the popover action API is invoked THEN the Linter extension SHALL provide methods for: applying the fix, deleting the issue text, dismissing the popover, and replacing text with custom content
+5. WHEN configuring the popover THEN the developer MAY customize styling properties including border, background, padding, and position offset
+6. WHEN the popover is rendered THEN the Linter extension SHALL position it relative to the lint icon using configurable placement (top, bottom, left, right)
+7. WHEN multiple issues exist at the same position THEN the popover SHALL display all issues at that location
+
+### Requirement 19: Popover Action API
+
+**User Story:** As a developer, I want a clean API for popover actions, so that I can build custom UI components that interact with lint issues.
+
+#### Acceptance Criteria
+
+1. WHEN the applyFix action is called THEN the Linter extension SHALL execute the issue's fix function and close the popover
+2. WHEN the deleteText action is called THEN the Linter extension SHALL remove the text in the issue range and close the popover
+3. WHEN the replaceText action is called with new text THEN the Linter extension SHALL replace the issue range with the provided text and close the popover
+4. WHEN the dismiss action is called THEN the Linter extension SHALL close the popover without making changes
+5. WHEN any action modifies the document THEN the Linter extension SHALL focus the editor after the action completes

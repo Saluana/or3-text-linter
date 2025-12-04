@@ -46,6 +46,13 @@ graph TB
         Widget[Widget Icons]
     end
 
+    subgraph "Popover System"
+        PopMgr[Popover Manager]
+        DefPop[Default Popover]
+        CustPop[Custom Renderer]
+        Actions[Popover Actions]
+    end
+
     subgraph "External AI Providers"
         OpenAI[OpenAI SDK]
         OpenRouter[OpenRouter]
@@ -60,6 +67,11 @@ graph TB
     PM --> DS
     DS --> Inline
     DS --> Widget
+    Widget -->|"Click"| PopMgr
+    PopMgr --> DefPop
+    PopMgr -.->|"Optional"| CustPop
+    PopMgr --> Actions
+    Actions -->|"applyFix/deleteText/replaceText"| Editor
 
     ALP -.->|"User provides"| OpenAI
     ALP -.->|"User provides"| OpenRouter
@@ -264,6 +276,232 @@ function renderIcon(issue: Issue): IconDivElement {
     icon.setAttribute('role', 'button');
     icon.setAttribute('aria-label', `Lint issue: ${issue.message}`);
     return icon;
+}
+```
+
+### Popover System
+
+The popover system provides a customizable UI for displaying issue details and actions when clicking lint icons.
+
+```typescript
+/**
+ * Actions available to popover renderers for interacting with issues
+ */
+export interface PopoverActions {
+    /** Apply the issue's fix function (if available) and close popover */
+    applyFix: () => void;
+    /** Delete the text in the issue range and close popover */
+    deleteText: () => void;
+    /** Replace the issue range with custom text and close popover */
+    replaceText: (newText: string) => void;
+    /** Close the popover without making changes */
+    dismiss: () => void;
+}
+
+/**
+ * Context passed to custom popover renderers
+ */
+export interface PopoverContext {
+    /** The issue(s) at this position */
+    issues: Issue[];
+    /** Available actions for the popover */
+    actions: PopoverActions;
+    /** The EditorView instance */
+    view: EditorView;
+}
+
+/**
+ * Custom popover renderer function type
+ * Returns an HTMLElement to display in the popover
+ */
+export type PopoverRenderer = (context: PopoverContext) => HTMLElement;
+
+/**
+ * Popover positioning options
+ */
+export type PopoverPlacement = 'top' | 'bottom' | 'left' | 'right';
+
+/**
+ * Popover styling configuration
+ */
+export interface PopoverStyle {
+    /** CSS border property */
+    border?: string;
+    /** CSS background property */
+    background?: string;
+    /** CSS padding property */
+    padding?: string;
+    /** CSS border-radius property */
+    borderRadius?: string;
+    /** CSS box-shadow property */
+    boxShadow?: string;
+    /** Offset from the icon in pixels */
+    offset?: number;
+}
+
+/**
+ * Popover configuration options
+ */
+export interface PopoverOptions {
+    /** Custom renderer function (optional - uses default if not provided) */
+    renderer?: PopoverRenderer;
+    /** Popover placement relative to icon */
+    placement?: PopoverPlacement;
+    /** Custom styling */
+    style?: PopoverStyle;
+    /** Whether to show severity indicator */
+    showSeverity?: boolean;
+    /** Whether to show fix button when available */
+    showFixButton?: boolean;
+}
+
+/**
+ * Extended Linter options with popover configuration
+ */
+export interface LinterOptions {
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>;
+    popover?: PopoverOptions;
+}
+```
+
+#### Default Popover Implementation
+
+```typescript
+function createDefaultPopover(context: PopoverContext): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'lint-popover';
+
+    for (const issue of context.issues) {
+        const issueEl = document.createElement('div');
+        issueEl.className = `lint-popover__issue lint-popover__issue--${issue.severity}`;
+
+        // Severity badge
+        const badge = document.createElement('span');
+        badge.className = 'lint-popover__severity';
+        badge.textContent = issue.severity;
+        issueEl.appendChild(badge);
+
+        // Message
+        const message = document.createElement('p');
+        message.className = 'lint-popover__message';
+        message.textContent = issue.message;
+        issueEl.appendChild(message);
+
+        // Actions
+        const actions = document.createElement('div');
+        actions.className = 'lint-popover__actions';
+
+        if (issue.fix) {
+            const fixBtn = document.createElement('button');
+            fixBtn.className = 'lint-popover__btn lint-popover__btn--fix';
+            fixBtn.textContent = 'Fix';
+            fixBtn.onclick = () => context.actions.applyFix();
+            actions.appendChild(fixBtn);
+        }
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.className = 'lint-popover__btn lint-popover__btn--dismiss';
+        dismissBtn.textContent = 'Dismiss';
+        dismissBtn.onclick = () => context.actions.dismiss();
+        actions.appendChild(dismissBtn);
+
+        issueEl.appendChild(actions);
+        container.appendChild(issueEl);
+    }
+
+    return container;
+}
+```
+
+#### Popover Manager
+
+```typescript
+class PopoverManager {
+    private popoverEl: HTMLElement | null = null;
+    private view: EditorView;
+    private options: PopoverOptions;
+
+    constructor(view: EditorView, options: PopoverOptions = {}) {
+        this.view = view;
+        this.options = options;
+    }
+
+    show(issues: Issue[], anchorEl: HTMLElement): void {
+        this.hide(); // Close any existing popover
+
+        const actions: PopoverActions = {
+            applyFix: () => {
+                const issue = issues.find((i) => i.fix);
+                if (issue?.fix) {
+                    issue.fix(this.view, issue);
+                    this.view.focus();
+                }
+                this.hide();
+            },
+            deleteText: () => {
+                const issue = issues[0];
+                if (issue) {
+                    this.view.dispatch(
+                        this.view.state.tr.delete(issue.from, issue.to)
+                    );
+                    this.view.focus();
+                }
+                this.hide();
+            },
+            replaceText: (newText: string) => {
+                const issue = issues[0];
+                if (issue) {
+                    this.view.dispatch(
+                        this.view.state.tr.replaceWith(
+                            issue.from,
+                            issue.to,
+                            this.view.state.schema.text(newText)
+                        )
+                    );
+                    this.view.focus();
+                }
+                this.hide();
+            },
+            dismiss: () => this.hide(),
+        };
+
+        const context: PopoverContext = {
+            issues,
+            actions,
+            view: this.view,
+        };
+
+        const renderer = this.options.renderer ?? createDefaultPopover;
+        this.popoverEl = renderer(context);
+        this.popoverEl.classList.add('lint-popover-container');
+
+        // Apply custom styles
+        if (this.options.style) {
+            Object.assign(this.popoverEl.style, this.options.style);
+        }
+
+        // Position relative to anchor
+        document.body.appendChild(this.popoverEl);
+        this.positionPopover(anchorEl);
+
+        // Setup close handlers
+        this.setupCloseHandlers();
+    }
+
+    hide(): void {
+        if (this.popoverEl) {
+            this.popoverEl.remove();
+            this.popoverEl = null;
+        }
+    }
+
+    private positionPopover(anchorEl: HTMLElement): void {
+        // Position calculation based on placement option
+    }
+
+    private setupCloseHandlers(): void {
+        // Click outside and Escape key handlers
+    }
 }
 ```
 
@@ -472,6 +710,30 @@ _For any_ configuration with N natural language rules, each returning M issues, 
 _For any_ call to `record()` without a severity parameter, the resulting Issue SHALL have severity 'warning'.
 
 **Validates: Requirements 2.4**
+
+### Property 21: Popover Opens on Icon Click
+
+_For any_ lint icon click event, the popover manager SHALL display a popover containing the associated issue(s).
+
+**Validates: Requirements 8.1, 8.2**
+
+### Property 22: Popover Actions Modify Document Correctly
+
+_For any_ popover action (applyFix, deleteText, replaceText), the action SHALL modify the document at the correct position range and close the popover.
+
+**Validates: Requirements 19.1, 19.2, 19.3**
+
+### Property 23: Popover Dismiss Closes Without Changes
+
+_For any_ dismiss action or click-outside/Escape event, the popover SHALL close without modifying the document.
+
+**Validates: Requirements 8.4, 19.4**
+
+### Property 24: Custom Popover Renderer Receives Correct Context
+
+_For any_ custom popover renderer, the renderer SHALL receive a PopoverContext with the correct issues array and functional action callbacks.
+
+**Validates: Requirements 18.2, 18.3**
 
 ## Error Handling
 

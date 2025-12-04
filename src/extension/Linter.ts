@@ -8,6 +8,7 @@ import type {
     Issue,
     LinterPluginClass,
     AsyncLinterPluginClass,
+    PopoverOptions,
 } from '../types';
 
 /**
@@ -34,9 +35,19 @@ export function renderIcon(issue: Issue): IconDivElement {
 
 /**
  * Options for the Linter extension
+ *
+ * Requirements: 18.1, 18.5, 18.6
  */
 export interface LinterOptions {
+    /** Array of linter plugin classes to run on the document */
     plugins: Array<LinterPluginClass | AsyncLinterPluginClass>;
+
+    /**
+     * Popover configuration options.
+     * When provided, clicking a lint icon will show a popover instead of selecting text.
+     * Requirements: 18.1, 18.5, 18.6
+     */
+    popover?: PopoverOptions;
 }
 
 /**

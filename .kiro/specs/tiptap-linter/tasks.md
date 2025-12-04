@@ -179,41 +179,134 @@
 
     -   Ensure all tests pass, ask the user if questions arise.
 
--   [ ] 12. Natural language rule factory
+-   [x] 12. Natural language rule factory
 
-    -   [ ] 12.1 Implement createNaturalLanguageRule factory
+    -   [x] 12.1 Implement createNaturalLanguageRule factory
         -   Accept NaturalLanguageRuleConfig with rule string and provider
         -   Return class extending AILinterPlugin
         -   Generate system prompt instructing AI to find violations
         -   Support optional severity and debounce config
         -   _Requirements: 16.1, 16.2, 17.1, 17.2, 17.3, 17.4, 17.5_
-    -   [ ] 12.2 Write property test for factory output
+    -   [x] 12.2 Write property test for factory output
         -   **Property 17: Natural Language Rule Factory Output**
         -   **Validates: Requirements 17.1**
-    -   [ ] 12.3 Write property test for provider invocation
+    -   [x] 12.3 Write property test for provider invocation
         -   **Property 18: Natural Language Rule Provider Invocation**
         -   **Validates: Requirements 16.2, 17.5**
-    -   [ ] 12.4 Write property test for multiple rules aggregation
+    -   [x] 12.4 Write property test for multiple rules aggregation
         -   **Property 19: Multiple Natural Language Rules Aggregation**
         -   **Validates: Requirements 16.5**
 
--   [ ] 13. Vue demo component
+-   [x] 13. Vue demo component
 
-    -   [ ] 13.1 Create LinterDemo.vue component
+    -   [x] 13.1 Create LinterDemo.vue component
         -   Import Tiptap editor and extensions
         -   Configure Linter with BadWords, Punctuation, HeadingLevel
         -   Create sample content with known issues
         -   Implement mounted/beforeUnmount lifecycle
         -   _Requirements: 11.1, 11.2_
-    -   [ ] 13.2 Add CSS styles for linter UI
+    -   [x] 13.2 Add CSS styles for linter UI
         -   Style .problem with severity variants (--info, --warning, --error)
         -   Style .lint-icon with severity variants
         -   Position icons correctly
         -   _Requirements: 9.3, 11.3_
 
--   [ ] 14. Export and package structure
+-   [x] 14. Popover system types and interfaces
 
-    -   [ ] 14.1 Create index.ts with public exports
+    -   [x] 14.1 Define popover type definitions
+        -   Define PopoverActions interface (applyFix, deleteText, replaceText, dismiss)
+        -   Define PopoverContext interface (issues, actions, view)
+        -   Define PopoverRenderer type
+        -   Define PopoverPlacement type ('top' | 'bottom' | 'left' | 'right')
+        -   Define PopoverStyle interface (border, background, padding, borderRadius, boxShadow, offset)
+        -   Define PopoverOptions interface (renderer, placement, style, showSeverity, showFixButton)
+        -   Update LinterOptions to include popover configuration
+        -   _Requirements: 18.1, 18.5, 18.6_
+
+-   [ ] 15. Popover manager implementation
+
+    -   [ ] 15.1 Implement PopoverManager class
+        -   Constructor accepts EditorView and PopoverOptions
+        -   Implement show() method to display popover with issues
+        -   Implement hide() method to close popover
+        -   Implement positionPopover() for placement calculation
+        -   Implement setupCloseHandlers() for click-outside and Escape key
+        -   _Requirements: 8.1, 8.4, 18.6_
+    -   [ ] 15.2 Implement PopoverActions
+        -   Implement applyFix action that executes fix function and closes popover
+        -   Implement deleteText action that removes issue range and closes popover
+        -   Implement replaceText action that substitutes text and closes popover
+        -   Implement dismiss action that closes without changes
+        -   Focus editor after document-modifying actions
+        -   _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5_
+    -   [ ] 15.3 Write property test for popover actions
+        -   **Property 22: Popover Actions Modify Document Correctly**
+        -   **Validates: Requirements 19.1, 19.2, 19.3**
+    -   [ ] 15.4 Write property test for dismiss action
+        -   **Property 23: Popover Dismiss Closes Without Changes**
+        -   **Validates: Requirements 8.4, 19.4**
+
+-   [ ] 16. Default popover renderer
+
+    -   [ ] 16.1 Implement createDefaultPopover function
+        -   Create container element with lint-popover class
+        -   Render severity badge for each issue
+        -   Render issue message
+        -   Render Fix button when issue has fix function
+        -   Render Dismiss button
+        -   Support multiple issues at same position
+        -   _Requirements: 18.3, 18.7_
+    -   [ ] 16.2 Add popover CSS styles
+        -   Style .lint-popover container with positioning
+        -   Style severity variants (--info, --warning, --error)
+        -   Style action buttons
+        -   Add arrow/pointer indicator
+        -   _Requirements: 9.3_
+
+-   [ ] 17. Integrate popover with Linter extension
+
+    -   [ ] 17.1 Update Linter extension for popover support
+        -   Add popover option to LinterOptions
+        -   Create PopoverManager instance in addProseMirrorPlugins
+        -   Update handleClick to show popover instead of selecting text
+        -   Remove handleDoubleClick (replaced by popover actions)
+        -   _Requirements: 8.1, 8.2, 8.3, 8.5_
+    -   [ ] 17.2 Write property test for popover opens on icon click
+        -   **Property 21: Popover Opens on Icon Click**
+        -   **Validates: Requirements 8.1, 8.2**
+    -   [ ] 17.3 Write property test for custom renderer context
+        -   **Property 24: Custom Popover Renderer Receives Correct Context**
+        -   **Validates: Requirements 18.2, 18.3**
+
+-   [ ] 18. Checkpoint
+
+    -   Ensure all tests pass, ask the user if questions arise.
+
+-   [ ] 19. Update demo component with popover
+
+    -   [ ] 19.1 Update LinterDemo.vue to showcase popover
+        -   Add popover CSS styles to demo
+        -   Optionally demonstrate custom popover renderer
+        -   Update sample content description
+        -   _Requirements: 11.3_
+
+-   [ ] 20. Export and package structure
+
+    -   [ ] 20.1 Create index.ts with public exports
+        -   Export Linter extension
+        -   Export LinterPlugin base class
+        -   Export AILinterPlugin base class
+        -   Export createNaturalLanguageRule factory
+        -   Export BadWords, Punctuation, HeadingLevel plugins
+        -   Export PopoverManager, createDefaultPopover
+        -   Export all types (Issue, Severity, FixFn, PopoverActions, PopoverContext, PopoverRenderer, PopoverOptions, etc.)
+        -   _Requirements: 13.5_
+
+-   [ ] 21. Final Checkpoint
+
+    -   Ensure all tests pass, ask the user if questions arise.
+
+    -   [x] 14.1 Create index.ts with public exports
         -   Export Linter extension
         -   Export LinterPlugin base class
         -   Export AILinterPlugin base class
