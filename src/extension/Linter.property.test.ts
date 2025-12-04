@@ -343,11 +343,9 @@ describe('Linter Async Plugin Property Tests', () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             // Call runAllLinterPlugins directly
-            const result = await runAllLinterPlugins(
-                editor.state.doc,
-                [AsyncTestPluginClass],
-                editor.view
-            );
+            const result = await runAllLinterPlugins(editor.state.doc, [
+                AsyncTestPluginClass,
+            ]);
 
             // Property: All async plugin issues should be included
             expect(result.issues).toHaveLength(issues.length);
@@ -404,11 +402,10 @@ describe('Linter Error Isolation Property Tests', () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             // Call runAllLinterPlugins with both working and failing plugins
-            const result = await runAllLinterPlugins(
-                editor.state.doc,
-                [FailingPluginClass, WorkingPluginClass],
-                editor.view
-            );
+            const result = await runAllLinterPlugins(editor.state.doc, [
+                FailingPluginClass,
+                WorkingPluginClass,
+            ]);
 
             // Property: Issues from working plugin should still be collected
             expect(result.issues).toHaveLength(issues.length);
@@ -469,11 +466,10 @@ describe('Linter Error Isolation Property Tests', () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             // Call runAllLinterPlugins with both working and failing async plugins
-            const result = await runAllLinterPlugins(
-                editor.state.doc,
-                [FailingAsyncPluginClass, WorkingAsyncPluginClass],
-                editor.view
-            );
+            const result = await runAllLinterPlugins(editor.state.doc, [
+                FailingAsyncPluginClass,
+                WorkingAsyncPluginClass,
+            ]);
 
             // Property: Issues from working async plugin should still be collected
             expect(result.issues).toHaveLength(issues.length);
@@ -548,11 +544,11 @@ describe('Linter Error Isolation Property Tests', () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             // Call runAllLinterPlugins with sync, async, and failing plugins
-            const result = await runAllLinterPlugins(
-                editor.state.doc,
-                [SyncPluginClass, FailingPluginClass, AsyncPluginClass],
-                editor.view
-            );
+            const result = await runAllLinterPlugins(editor.state.doc, [
+                SyncPluginClass,
+                FailingPluginClass,
+                AsyncPluginClass,
+            ]);
 
             // Property: Issues from both working sync and async plugins should be collected
             const expectedTotalIssues = syncIssues.length + asyncIssues.length;

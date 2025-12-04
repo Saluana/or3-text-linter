@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as ProsemirrorNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
@@ -74,13 +74,11 @@ export interface LinterStorage {
  *
  * @param doc - The ProseMirror document to scan
  * @param plugins - Array of plugin classes to run
- * @param view - The EditorView for creating decorations
  * @returns Promise resolving to object with DecorationSet and issues array
  */
 export async function runAllLinterPlugins(
     doc: ProsemirrorNode,
-    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>,
-    _view: EditorView
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>
 ): Promise<{ decorations: DecorationSet; issues: Issue[] }> {
     // Run all plugins concurrently (Requirement 12.3)
     // Each plugin is wrapped in its own async function to handle both sync and async scan()
@@ -110,27 +108,8 @@ export async function runAllLinterPlugins(
         }
     }
 
-    // Create decorations from issues
-    const decorations: Decoration[] = [];
-
-    for (const issue of allIssues) {
-        // Create inline decoration with severity class (Requirements 1.4, 9.1)
-        decorations.push(
-            Decoration.inline(issue.from, issue.to, {
-                class: `problem problem--${issue.severity}`,
-            })
-        );
-
-        // Create widget decoration with icon (Requirement 1.5)
-        decorations.push(
-            Decoration.widget(issue.from, () => renderIcon(issue), {
-                side: -1,
-            })
-        );
-    }
-
     return {
-        decorations: DecorationSet.create(doc, decorations),
+        decorations: createDecorationSet(doc, allIssues),
         issues: allIssues,
     };
 }
@@ -350,9 +329,6 @@ function handleClickLegacy(view: EditorView, event: MouseEvent): boolean {
     if (!issue) {
         return false;
     }
-
-    // Import TextSelection dynamically to avoid unused import when popover is used
-    const { TextSelection } = require('@tiptap/pm/state');
 
     // Create TextSelection from issue.from/to and scroll into view
     const { from, to } = issue;

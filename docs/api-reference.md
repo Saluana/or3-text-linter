@@ -621,8 +621,7 @@ import { runAllLinterPlugins } from 'tiptap-linter';
 
 async function runAllLinterPlugins(
     doc: ProsemirrorNode,
-    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>,
-    view: EditorView
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>
 ): Promise<{ decorations: DecorationSet; issues: Issue[] }>;
 ```
 

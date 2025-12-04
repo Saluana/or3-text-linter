@@ -51,7 +51,7 @@ export abstract class AILinterPlugin extends LinterPlugin {
      */
     protected extractTextWithPositions(): TextExtractionResult {
         const segments: TextSegment[] = [];
-        let fullText = '';
+        const textParts: string[] = [];
         let textOffset = 0;
 
         this.doc.descendants((node, pos) => {
@@ -60,19 +60,19 @@ export abstract class AILinterPlugin extends LinterPlugin {
                     text: node.text,
                     from: pos,
                     to: pos + node.text.length,
-                    textOffset: textOffset,
+                    textOffset,
                 });
-                fullText += node.text;
+                textParts.push(node.text);
                 textOffset += node.text.length;
             } else if (node.isBlock && segments.length > 0) {
                 // Add newline for block boundaries to preserve structure
-                fullText += '\n';
+                textParts.push('\n');
                 textOffset += 1;
             }
             return true; // Continue traversing
         });
 
-        return { fullText, segments };
+        return { fullText: textParts.join(''), segments };
     }
 
     /**
