@@ -633,7 +633,7 @@ describe('Linter Popover Integration Property Tests', () => {
                 if (clickedIssue) {
                     const issuesAtPosition =
                         editor.storage.linter.issues.filter(
-                            (issue) =>
+                            (issue: Issue) =>
                                 issue.from === clickedIssue.from &&
                                 issue.to === clickedIssue.to
                         );
@@ -870,27 +870,24 @@ describe('Custom Popover Renderer Property Tests', () => {
                 // Property: Custom renderer should have been called with correct context
                 expect(receivedContext).not.toBeNull();
 
-                if (receivedContext) {
-                    // Property: Context should contain the correct issues array (Requirement 18.2)
-                    expect(receivedContext.issues).toHaveLength(issues.length);
-                    for (let i = 0; i < issues.length; i++) {
-                        expect(receivedContext.issues[i].message).toBe(
-                            issues[i].message
-                        );
-                        expect(receivedContext.issues[i].severity).toBe(
-                            issues[i].severity
-                        );
-                    }
+                // Use non-null assertion since we just checked it's not null
+                const ctx = receivedContext!;
 
-                    // Property: Context should have functional action callbacks (Requirement 18.3)
-                    expect(receivedContext.hasApplyFix).toBe(true);
-                    expect(receivedContext.hasDeleteText).toBe(true);
-                    expect(receivedContext.hasReplaceText).toBe(true);
-                    expect(receivedContext.hasDismiss).toBe(true);
-
-                    // Property: Context should have the EditorView
-                    expect(receivedContext.hasView).toBe(true);
+                // Property: Context should contain the correct issues array (Requirement 18.2)
+                expect(ctx.issues).toHaveLength(issues.length);
+                for (let i = 0; i < issues.length; i++) {
+                    expect(ctx.issues[i].message).toBe(issues[i].message);
+                    expect(ctx.issues[i].severity).toBe(issues[i].severity);
                 }
+
+                // Property: Context should have functional action callbacks (Requirement 18.3)
+                expect(ctx.hasApplyFix).toBe(true);
+                expect(ctx.hasDeleteText).toBe(true);
+                expect(ctx.hasReplaceText).toBe(true);
+                expect(ctx.hasDismiss).toBe(true);
+
+                // Property: Context should have the EditorView
+                expect(ctx.hasView).toBe(true);
 
                 // Clean up
                 popoverManager.hide();
@@ -998,23 +995,24 @@ describe('Custom Popover Renderer Property Tests', () => {
                 // Property: Actions should be captured
                 expect(capturedActions).not.toBeNull();
 
-                if (capturedActions) {
-                    // Get initial content
-                    const initialContent = editor.state.doc.textContent;
+                // Use non-null assertion since we just checked it's not null
+                const actions = capturedActions!;
 
-                    // Test applyFix action
-                    capturedActions.applyFix();
+                // Get initial content
+                const initialContent = editor.state.doc.textContent;
 
-                    await new Promise((resolve) => setTimeout(resolve, 10));
+                // Test applyFix action
+                actions.applyFix();
 
-                    // Property: applyFix should have modified the document
-                    const newContent = editor.state.doc.textContent;
-                    expect(newContent).toContain('FIXED');
-                    expect(newContent).not.toBe(initialContent);
+                await new Promise((resolve) => setTimeout(resolve, 10));
 
-                    // Property: Popover should be closed after action
-                    expect(popoverManager.isVisible()).toBe(false);
-                }
+                // Property: applyFix should have modified the document
+                const newContent = editor.state.doc.textContent;
+                expect(newContent).toContain('FIXED');
+                expect(newContent).not.toBe(initialContent);
+
+                // Property: Popover should be closed after action
+                expect(popoverManager.isVisible()).toBe(false);
             }
 
             editor.destroy();

@@ -134,10 +134,7 @@ describe('PopoverManager Property Tests', () => {
                 const initialContent = editor.state.doc.textContent;
                 const initialLength = initialContent.length;
 
-                // Calculate expected deletion length (clamped to valid range)
-                const validFrom = Math.min(issue.from, initialLength);
-                const validTo = Math.min(issue.to, initialLength + 1);
-                const expectedDeletion = Math.max(0, validTo - validFrom);
+                // Note: Positions are clamped to document bounds in the actual operation below
 
                 // Show popover - this creates the actions internally
                 popoverManager.show([issue], anchorEl);

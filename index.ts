@@ -75,6 +75,15 @@ export { createNaturalLanguageRule } from './src/factory/createNaturalLanguageRu
 export type { NaturalLanguageRuleConfig } from './src/factory/createNaturalLanguageRule';
 
 // ============================================================================
+// Popover System
+// ============================================================================
+
+export {
+    PopoverManager,
+    createDefaultPopover,
+} from './src/extension/PopoverManager';
+
+// ============================================================================
 // Built-in Plugins
 // ============================================================================
 

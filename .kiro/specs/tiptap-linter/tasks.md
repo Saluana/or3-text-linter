@@ -290,9 +290,9 @@
         -   Update sample content description
         -   _Requirements: 11.3_
 
--   [ ] 20. Export and package structure
+-   [x] 20. Export and package structure
 
-    -   [ ] 20.1 Create index.ts with public exports
+    -   [x] 20.1 Create index.ts with public exports
         -   Export Linter extension
         -   Export LinterPlugin base class
         -   Export AILinterPlugin base class
