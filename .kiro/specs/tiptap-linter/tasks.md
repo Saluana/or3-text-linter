@@ -73,19 +73,19 @@
         -   **Property 10: HeadingLevel Fix Round-Trip**
         -   **Validates: Requirements 7.3, 7.4**
 
--   [ ] 6. Checkpoint
+-   [x] 6. Checkpoint
 
     -   Ensure all tests pass, ask the user if questions arise.
 
--   [ ] 7. Core Linter extension
+-   [x] 7. Core Linter extension
 
-    -   [ ] 7.1 Implement icon rendering with severity classes
+    -   [x] 7.1 Implement icon rendering with severity classes
         -   Create renderIcon function returning IconDivElement
         -   Attach issue to element
         -   Apply severity-based CSS classes
         -   Add accessibility attributes (role, aria-label)
         -   _Requirements: 1.5, 9.2_
-    -   [ ] 7.2 Implement runAllLinterPlugins function
+    -   [x] 7.2 Implement runAllLinterPlugins function
         -   Accept doc and plugin array
         -   Instantiate each plugin and call scan()
         -   Handle both sync returns and Promise returns
@@ -94,7 +94,7 @@
         -   Create widget decorations with icons
         -   Return DecorationSet
         -   _Requirements: 1.1, 1.4, 9.1_
-    -   [ ] 7.3 Implement Linter extension with ProseMirror plugin
+    -   [x] 7.3 Implement Linter extension with ProseMirror plugin
         -   Define LinterOptions interface
         -   Define LinterStorage interface with getIssues()
         -   Implement addOptions() returning plugins array
@@ -104,27 +104,27 @@
         -   Rebuild DecorationSet when docChanged is true
         -   Update storage.issues after computing
         -   _Requirements: 1.2, 1.3, 10.1, 10.2, 10.3_
-    -   [ ] 7.4 Implement click handlers
+    -   [x] 7.4 Implement click handlers
         -   handleClick: use closest() to find lint-icon
         -   Create TextSelection from issue.from/to
         -   Dispatch transaction with scrollIntoView
         -   handleDoubleClick: execute fix function if present
         -   Focus editor after fix
         -   _Requirements: 8.1, 8.2, 8.3, 8.4_
-    -   [ ] 7.5 Write property test for decoration severity classes
+    -   [x] 7.5 Write property test for decoration severity classes
         -   **Property 3: Decoration Severity Class Consistency**
         -   **Validates: Requirements 1.4, 9.1, 9.2**
-    -   [ ] 7.6 Write property test for storage synchronization
+    -   [x] 7.6 Write property test for storage synchronization
         -   **Property 4: Storage Issues Synchronization**
         -   **Validates: Requirements 10.2, 10.3**
-    -   [ ] 7.7 Write property test for DecorationSet reuse
+    -   [x] 7.7 Write property test for DecorationSet reuse
         -   **Property 5: DecorationSet Reuse on Non-Doc Transactions**
         -   **Validates: Requirements 1.3**
-    -   [ ] 7.8 Write property test for DecorationSet rebuild
+    -   [x] 7.8 Write property test for DecorationSet rebuild
         -   **Property 6: DecorationSet Rebuild on Doc Changes**
         -   **Validates: Requirements 1.2**
 
--   [ ] 8. Checkpoint
+-   [x] 8. Checkpoint
 
     -   Ensure all tests pass, ask the user if questions arise.
 

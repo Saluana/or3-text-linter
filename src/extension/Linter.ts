@@ -1,0 +1,307 @@
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { TextSelection } from '@tiptap/pm/state';
+import type { Node as ProsemirrorNode } from '@tiptap/pm/model';
+import type { EditorView } from '@tiptap/pm/view';
+import type {
+    Issue,
+    LinterPluginClass,
+    AsyncLinterPluginClass,
+} from '../types';
+
+/**
+ * Extended HTMLDivElement interface for lint icons with attached issue data
+ */
+export interface IconDivElement extends HTMLDivElement {
+    issue?: Issue;
+}
+
+/**
+ * Render a lint icon element with severity-based styling and accessibility attributes
+ * @param issue - The Issue object to render an icon for
+ * @returns IconDivElement with attached issue data
+ */
+export function renderIcon(issue: Issue): IconDivElement {
+    const icon = document.createElement('div') as IconDivElement;
+    icon.className = `lint-icon lint-icon--${issue.severity}`;
+    icon.title = issue.message;
+    icon.issue = issue;
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('aria-label', `Lint issue: ${issue.message}`);
+    return icon;
+}
+
+/**
+ * Options for the Linter extension
+ */
+export interface LinterOptions {
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>;
+}
+
+/**
+ * Storage interface for accessing issues programmatically
+ */
+export interface LinterStorage {
+    issues: Issue[];
+    getIssues(): Issue[];
+}
+
+/**
+ * Run all linter plugins (sync and async) and create a DecorationSet
+ * @param doc - The ProseMirror document to scan
+ * @param plugins - Array of plugin classes to run
+ * @param view - The EditorView for creating decorations
+ * @returns Promise resolving to object with DecorationSet and issues array
+ */
+export async function runAllLinterPlugins(
+    doc: ProsemirrorNode,
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>,
+    _view: EditorView
+): Promise<{ decorations: DecorationSet; issues: Issue[] }> {
+    const allIssues: Issue[] = [];
+
+    // Run all plugins and collect issues
+    const pluginPromises = plugins.map(async (PluginClass) => {
+        try {
+            const plugin = new PluginClass(doc);
+            const result = plugin.scan();
+
+            // Handle both sync and async returns
+            if (result instanceof Promise) {
+                await result;
+            }
+
+            return plugin.getResults();
+        } catch (error) {
+            console.error(`Linter plugin ${PluginClass.name} failed:`, error);
+            return [];
+        }
+    });
+
+    // Wait for all plugins to complete
+    const results = await Promise.allSettled(pluginPromises);
+
+    // Collect issues from successful plugins
+    for (const result of results) {
+        if (result.status === 'fulfilled') {
+            allIssues.push(...result.value);
+        }
+    }
+
+    // Create decorations from issues
+    const decorations: Decoration[] = [];
+
+    for (const issue of allIssues) {
+        // Create inline decoration with severity class (Requirements 1.4, 9.1)
+        decorations.push(
+            Decoration.inline(issue.from, issue.to, {
+                class: `problem problem--${issue.severity}`,
+            })
+        );
+
+        // Create widget decoration with icon (Requirement 1.5)
+        decorations.push(
+            Decoration.widget(issue.from, () => renderIcon(issue), {
+                side: -1,
+            })
+        );
+    }
+
+    return {
+        decorations: DecorationSet.create(doc, decorations),
+        issues: allIssues,
+    };
+}
+
+const linterPluginKey = new PluginKey('linter');
+
+/**
+ * Linter Tiptap extension that runs configurable lint plugins
+ * and manages decorations for detected issues.
+ */
+export const Linter = Extension.create<LinterOptions, LinterStorage>({
+    name: 'linter',
+
+    addOptions() {
+        return {
+            plugins: [],
+        };
+    },
+
+    addStorage() {
+        return {
+            issues: [] as Issue[],
+            getIssues() {
+                return this.issues;
+            },
+        };
+    },
+
+    addProseMirrorPlugins() {
+        const extension = this;
+
+        return [
+            new Plugin({
+                key: linterPluginKey,
+                state: {
+                    init: (_, state) => {
+                        // Run plugins synchronously for initial state
+                        const issues = runSyncPlugins(
+                            state.doc,
+                            extension.options.plugins
+                        );
+                        extension.storage.issues = issues;
+                        return createDecorationSet(state.doc, issues);
+                    },
+                    apply: (tr, oldDecorations, _oldState, newState) => {
+                        // Reuse DecorationSet when document hasn't changed (Requirement 1.3)
+                        if (!tr.docChanged) {
+                            return oldDecorations;
+                        }
+
+                        // Rebuild DecorationSet when document changed (Requirement 1.2)
+                        const issues = runSyncPlugins(
+                            newState.doc,
+                            extension.options.plugins
+                        );
+                        extension.storage.issues = issues;
+                        return createDecorationSet(newState.doc, issues);
+                    },
+                },
+                props: {
+                    decorations(state) {
+                        return this.getState(state);
+                    },
+                    handleClick: (view, _pos, event) => {
+                        return handleClick(view, event);
+                    },
+                    handleDoubleClick: (view, _pos, event) => {
+                        return handleDoubleClick(view, event);
+                    },
+                },
+            }),
+        ];
+    },
+});
+
+/**
+ * Run all sync linter plugins and collect issues
+ * @param doc - The ProseMirror document to scan
+ * @param plugins - Array of plugin classes to run
+ * @returns Array of issues from all plugins
+ */
+function runSyncPlugins(
+    doc: ProsemirrorNode,
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>
+): Issue[] {
+    const allIssues: Issue[] = [];
+
+    for (const PluginClass of plugins) {
+        try {
+            const plugin = new PluginClass(doc);
+            const result = plugin.scan();
+
+            // Skip async plugins in sync context
+            if (result instanceof Promise) {
+                continue;
+            }
+
+            allIssues.push(...plugin.getResults());
+        } catch (error) {
+            console.error(`Linter plugin ${PluginClass.name} failed:`, error);
+        }
+    }
+
+    return allIssues;
+}
+
+/**
+ * Create a DecorationSet from an array of issues
+ * @param doc - The ProseMirror document
+ * @param issues - Array of issues to create decorations for
+ * @returns DecorationSet with inline and widget decorations
+ */
+export function createDecorationSet(
+    doc: ProsemirrorNode,
+    issues: Issue[]
+): DecorationSet {
+    const decorations: Decoration[] = [];
+
+    for (const issue of issues) {
+        // Create inline decoration with severity class (Requirements 1.4, 9.1)
+        decorations.push(
+            Decoration.inline(issue.from, issue.to, {
+                class: `problem problem--${issue.severity}`,
+            })
+        );
+
+        // Create widget decoration with icon (Requirement 1.5)
+        decorations.push(
+            Decoration.widget(issue.from, () => renderIcon(issue), {
+                side: -1,
+            })
+        );
+    }
+
+    return DecorationSet.create(doc, decorations);
+}
+
+/**
+ * Handle single click on lint icons - select the issue text range
+ * @param view - The EditorView
+ * @param event - The mouse event
+ * @returns true if the click was handled, false otherwise
+ */
+function handleClick(view: EditorView, event: MouseEvent): boolean {
+    const target = event.target as HTMLElement;
+
+    // Use closest() to find lint-icon element (Requirement 8.3)
+    const icon = target.closest('.lint-icon') as IconDivElement | null;
+    if (!icon) {
+        return false;
+    }
+
+    // Retrieve issue from icon element's attached data (Requirement 8.4)
+    const issue = icon.issue;
+    if (!issue) {
+        return false;
+    }
+
+    // Create TextSelection from issue.from/to and scroll into view (Requirement 8.1)
+    const { from, to } = issue;
+    const tr = view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, from, to)
+    );
+    view.dispatch(tr.scrollIntoView());
+
+    return true;
+}
+
+/**
+ * Handle double click on lint icons - execute fix function if present
+ * @param view - The EditorView
+ * @param event - The mouse event
+ * @returns true if the click was handled, false otherwise
+ */
+function handleDoubleClick(view: EditorView, event: MouseEvent): boolean {
+    const target = event.target as HTMLElement;
+
+    // Use closest() to find lint-icon element (Requirement 8.3)
+    const icon = target.closest('.lint-icon') as IconDivElement | null;
+    if (!icon) {
+        return false;
+    }
+
+    // Retrieve issue from icon element's attached data (Requirement 8.4)
+    const issue = icon.issue;
+    if (!issue || !issue.fix) {
+        return false;
+    }
+
+    // Execute fix function and focus editor (Requirement 8.2)
+    issue.fix(view, issue);
+    view.focus();
+
+    return true;
+}
