@@ -34,9 +34,11 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 1. **Fork the repository** and create your branch from `main`
 2. **Make your changes** following the code style guidelines
 3. **Add tests** if you've added code that should be tested
-4. **Ensure the test suite passes** (`npm test`)
-5. **Update documentation** as needed
-6. **Write a clear commit message** describing your changes
+4. **Run linter** (`npm run lint`) and fix all issues
+5. **Ensure the test suite passes** (`npm test`)
+6. **Ensure the build succeeds** (`npm run build`)
+7. **Update documentation** as needed
+8. **Write a clear commit message** describing your changes
 
 ## Development Setup
 
@@ -48,6 +50,12 @@ cd or3-text-linter
 # Install dependencies
 npm install
 
+# Run linter
+npm run lint
+
+# Run linter with auto-fix
+npm run lint:fix
+
 # Run tests
 npm test
 
@@ -56,15 +64,28 @@ npm run test:watch
 
 # Run development server
 npm run dev
+
+# Build the project
+npm run build
 ```
 
 ## Code Style Guidelines
+
+### Linting
+
+This project uses ESLint with strict TypeScript rules to ensure code quality and type safety:
+
+- **Run `npm run lint`** before committing to catch issues early
+- **Zero warnings policy** - ESLint is configured with `--max-warnings 0`
+- **Auto-fix when possible** - Use `npm run lint:fix` to automatically fix some issues
+- All code must pass ESLint checks before being merged
 
 ### TypeScript
 
 - Use TypeScript for all new code
 - Enable strict mode and fix all type errors
-- Prefer explicit types over `any`
+- **Never use `any` types** - ESLint will error on explicit `any` usage
+- Prefer explicit type guards over non-null assertions (`!`)
 - Use interfaces for public APIs, types for internal use
 - Document all exported functions and classes with JSDoc
 
