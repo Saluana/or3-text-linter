@@ -53,6 +53,7 @@ export abstract class AILinterPlugin extends LinterPlugin {
         const segments: TextSegment[] = [];
         const textParts: string[] = [];
         let textOffset = 0;
+        let addedNewlineForBlock = false;
 
         this.doc.descendants((node, pos) => {
             if (node.isText && node.text) {
@@ -64,10 +65,13 @@ export abstract class AILinterPlugin extends LinterPlugin {
                 });
                 textParts.push(node.text);
                 textOffset += node.text.length;
-            } else if (node.isBlock && segments.length > 0) {
+                addedNewlineForBlock = false; // Reset flag after text node
+            } else if (node.isBlock && segments.length > 0 && !addedNewlineForBlock) {
                 // Add newline for block boundaries to preserve structure
+                // Only add once per block to avoid duplicate newlines
                 textParts.push('\n');
                 textOffset += 1;
+                addedNewlineForBlock = true;
             }
             return true; // Continue traversing
         });
@@ -90,6 +94,11 @@ export abstract class AILinterPlugin extends LinterPlugin {
         segments: TextSegment[],
         fullText: string
     ): { from: number; to: number } | null {
+        // Validate inputs
+        if (!textMatch || !segments || segments.length === 0 || !fullText) {
+            return null;
+        }
+        
         // Find the text match in the full text
         const textIndex = fullText.indexOf(textMatch);
         if (textIndex === -1) {
@@ -224,7 +233,9 @@ export abstract class AILinterPlugin extends LinterPlugin {
             }
         } catch (error) {
             // Silently fail - no issues recorded (Requirement 15.4)
-            console.error('Failed to parse AI response:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('[Tiptap Linter] Failed to parse AI response:', error);
+            }
         }
     }
 

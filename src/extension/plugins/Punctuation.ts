@@ -62,16 +62,16 @@ export class Punctuation extends LinterPlugin {
 
     /**
      * Creates a fix function that replaces the malformed text with
-     * properly spaced punctuation (punctuation only, removing the space before).
-     * Does not add trailing space - let the user decide spacing after punctuation.
+     * properly spaced punctuation (punctuation followed by a single space).
+     * Removes space before and adds a space after for correct formatting.
      */
     private createFix(punctuation: string) {
         return (view: EditorView, issue: Issue): void => {
-            // Replace " ," with just "," (remove space before only)
+            // Replace " ," with ", " (remove space before, add space after)
             const tr = view.state.tr.replaceWith(
                 issue.from,
                 issue.to,
-                view.state.schema.text(punctuation)
+                view.state.schema.text(punctuation + ' ')
             );
             view.dispatch(tr);
         };

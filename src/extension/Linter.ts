@@ -104,7 +104,9 @@ export async function runAllLinterPlugins(
             allIssues.push(...result.value);
         } else {
             // Log errors but continue processing (Requirement 12.4)
-            console.error('Linter plugin failed:', result.reason);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('[Tiptap Linter] Plugin failed:', result.reason);
+            }
         }
     }
 
@@ -137,6 +139,14 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
             },
             popoverManager: null as PopoverManager | null,
         };
+    },
+
+    onDestroy() {
+        // Clean up PopoverManager when extension is destroyed to prevent memory leaks
+        if (this.storage.popoverManager) {
+            this.storage.popoverManager.hide();
+            this.storage.popoverManager = null;
+        }
     },
 
     addProseMirrorPlugins() {
@@ -225,7 +235,9 @@ function runSyncPlugins(
 
             allIssues.push(...plugin.getResults());
         } catch (error) {
-            console.error(`Linter plugin ${PluginClass.name} failed:`, error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error(`[Tiptap Linter] Plugin ${PluginClass.name} failed:`, error);
+            }
         }
     }
 
@@ -243,8 +255,17 @@ export function createDecorationSet(
     issues: Issue[]
 ): DecorationSet {
     const decorations: Decoration[] = [];
+    const docSize = doc.content.size;
 
     for (const issue of issues) {
+        // Validate issue positions are within document bounds
+        if (issue.from < 0 || issue.to > docSize || issue.from >= issue.to) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[Tiptap Linter] Invalid issue position:', issue);
+            }
+            continue;
+        }
+        
         // Create inline decoration with severity class (Requirements 1.4, 9.1)
         decorations.push(
             Decoration.inline(issue.from, issue.to, {
