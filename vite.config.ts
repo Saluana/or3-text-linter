@@ -7,14 +7,25 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     plugins: [vue()],
     resolve: {
         alias: {
             '@': resolve(__dirname, './src'),
         },
     },
+    // Only set root for dev server, not for build
+    ...(command === 'serve'
+        ? {
+              root: resolve(__dirname, 'src/demo'),
+              server: {
+                  host: '0.0.0.0',
+                  port: 5173,
+              },
+          }
+        : {}),
     build: {
+        outDir: resolve(__dirname, 'dist'),
         copyPublicDir: false,
         lib: {
             entry: resolve(__dirname, 'index.ts'),
@@ -34,10 +45,4 @@ export default defineConfig({
             },
         },
     },
-    // Dev server config for demo
-    root: resolve(__dirname, 'src/demo'),
-    server: {
-        host: '0.0.0.0',
-        port: 5173,
-    },
-});
+}));

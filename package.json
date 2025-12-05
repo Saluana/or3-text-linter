@@ -1,6 +1,6 @@
 {
     "name": "or3-text-linter",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "A comprehensive, extensible linting solution for Tiptap and ProseMirror editors with AI-powered rules and customizable popovers",
     "main": "./dist/index.js",
     "module": "./dist/index.js",
