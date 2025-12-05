@@ -61,18 +61,40 @@ export type AsyncLinterPluginClass = new (
 // ============================================================================
 
 /**
+ * Tool definition for AI providers that support function/tool calling.
+ * Compatible with OpenAI, Anthropic, and OpenRouter tool formats.
+ */
+export interface AITool {
+    type: 'function';
+    function: {
+        name: string;
+        description: string;
+        parameters: {
+            type: 'object';
+            properties: Record<string, unknown>;
+            required?: string[];
+        };
+    };
+}
+
+/**
  * AI provider function type - user provides their own implementation
  * using OpenAI SDK, OpenRouter, Vercel AI SDK, or custom provider.
  *
+ * The provider receives tools for structured output. When tools are provided,
+ * the provider should use tool/function calling for more reliable results.
+ *
  * @param prompt - The system prompt instructing the AI what to look for
  * @param content - The document text content to analyze
+ * @param tools - Optional tool definitions for structured output
  * @returns Promise resolving to AIResponse with detected issues
  *
  * Requirements: 13.1, 14.1
  */
 export type AIProviderFn = (
     prompt: string,
-    content: string
+    content: string,
+    tools?: AITool[]
 ) => Promise<AIResponse>;
 
 /**
@@ -227,7 +249,7 @@ export interface PopoverOptions {
      * Custom renderer function for the popover content.
      * If not provided, a default popover will be used.
      * Requirement: 18.1
-     * 
+     *
      * Note: Cannot be used together with `vueComponent`.
      */
     renderer?: PopoverRenderer;
@@ -237,7 +259,7 @@ export interface PopoverOptions {
      * When provided, a Vue component will be rendered instead of using the renderer.
      * The component receives the PopoverContext as props and can access popover actions
      * via Vue's inject API using the 'popoverActions' key.
-     * 
+     *
      * Note: Cannot be used together with `renderer`.
      */
     vueComponent?: VuePopoverComponent;

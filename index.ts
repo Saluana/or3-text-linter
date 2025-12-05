@@ -23,6 +23,7 @@ export type {
     AsyncLinterPluginClass,
 
     // AI plugin types
+    AITool,
     AIProviderFn,
     AIResponse,
     AILinterPluginConfig,

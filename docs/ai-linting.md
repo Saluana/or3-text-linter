@@ -21,7 +21,8 @@ The Tiptap Linter supports two approaches for AI-powered linting:
 
 Both approaches are:
 
--   **Provider-agnostic** - Use OpenAI, Anthropic, Cohere, or any LLM
+-   **Provider-agnostic** - Use OpenAI, Anthropic, OpenRouter, or any LLM
+-   **Tool-calling based** - Uses function/tool calling for reliable structured output
 -   **Non-blocking** - Async execution keeps your editor responsive
 -   **Error-resilient** - Failures in one plugin don't affect others
 
@@ -31,26 +32,35 @@ The easiest way to add AI linting is with `createNaturalLanguageRule()`:
 
 ```typescript
 import { Linter, createNaturalLanguageRule } from 'tiptap-linter';
+import OpenAI from 'openai';
 
-// Define your AI provider function
-const aiProvider = async (prompt: string, content: string) => {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Define your AI provider function with tool calling support
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
+    const response = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+            { role: 'system', content: prompt },
+            { role: 'user', content },
+        ],
+        tools,
+        tool_choice: {
+            type: 'function',
+            function: { name: 'report_lint_issues' },
         },
-        body: JSON.stringify({
-            model: 'gpt-4',
-            messages: [
-                { role: 'system', content: prompt },
-                { role: 'user', content },
-            ],
-        }),
     });
 
-    const data = await response.json();
-    return JSON.parse(data.choices[0].message.content);
+    // Extract result from tool call
+    const toolCall = response.choices[0].message.tool_calls?.[0];
+    if (toolCall?.function.name === 'report_lint_issues') {
+        return JSON.parse(toolCall.function.arguments);
+    }
+    return { issues: [] };
 };
 
 // Create a natural language rule
@@ -77,20 +87,33 @@ const editor = new Editor({
 
 ```typescript
 import OpenAI from 'openai';
+import type { AITool } from 'tiptap-linter';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const aiProvider = async (prompt: string, content: string) => {
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
     const response = await openai.chat.completions.create({
         model: 'gpt-4',
         messages: [
             { role: 'system', content: prompt },
             { role: 'user', content },
         ],
-        response_format: { type: 'json_object' },
+        tools,
+        tool_choice: {
+            type: 'function',
+            function: { name: 'report_lint_issues' },
+        },
     });
 
-    return JSON.parse(response.choices[0].message.content!);
+    const toolCall = response.choices[0].message.tool_calls?.[0];
+    if (toolCall?.function.name === 'report_lint_issues') {
+        return JSON.parse(toolCall.function.arguments);
+    }
+    return { issues: [] };
 };
 ```
 
@@ -98,20 +121,97 @@ const aiProvider = async (prompt: string, content: string) => {
 
 ```typescript
 import Anthropic from '@anthropic-ai/sdk';
+import type { AITool } from 'tiptap-linter';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const aiProvider = async (prompt: string, content: string) => {
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
+    // Convert tools to Anthropic format
+    const anthropicTools = tools?.map((t) => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters,
+    }));
+
     const response = await anthropic.messages.create({
         model: 'claude-3-opus-20240229',
         max_tokens: 1024,
         system: prompt,
         messages: [{ role: 'user', content }],
+        tools: anthropicTools,
+        tool_choice: { type: 'tool', name: 'report_lint_issues' },
     });
 
-    const text =
-        response.content[0].type === 'text' ? response.content[0].text : '';
-    return JSON.parse(text);
+    // Extract from tool use block
+    const toolUse = response.content.find((block) => block.type === 'tool_use');
+    if (toolUse && toolUse.type === 'tool_use') {
+        return toolUse.input as {
+            issues: Array<{
+                message: string;
+                textMatch: string;
+                suggestion?: string;
+            }>;
+        };
+    }
+    return { issues: [] };
+};
+```
+
+### OpenRouter
+
+```typescript
+import { OpenRouter } from '@openrouter/sdk';
+import type { AITool } from 'tiptap-linter';
+
+const openRouter = new OpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
+
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
+    const response = await openRouter.chat.send({
+        model: 'openai/gpt-4',
+        messages: [
+            { role: 'system', content: prompt },
+            { role: 'user', content },
+        ],
+        tools,
+        tool_choice: {
+            type: 'function',
+            function: { name: 'report_lint_issues' },
+        },
+        stream: false,
+    });
+
+    // Handle both camelCase (SDK) and snake_case (API) responses
+    const toolCalls =
+        response.choices[0].message.toolCalls ??
+        response.choices[0].message.tool_calls;
+    if (toolCalls && toolCalls.length > 0) {
+        // Merge issues from all tool calls (some models may split responses)
+        const allIssues: Array<{
+            message: string;
+            textMatch: string;
+            suggestion?: string;
+        }> = [];
+        for (const toolCall of toolCalls) {
+            if (toolCall.function.name === 'report_lint_issues') {
+                const result = JSON.parse(
+                    toolCall.function.arguments as string
+                );
+                if (result.issues) {
+                    allIssues.push(...result.issues);
+                }
+            }
+        }
+        return { issues: allIssues };
+    }
+    return { issues: [] };
 };
 ```
 
@@ -120,43 +220,41 @@ const aiProvider = async (prompt: string, content: string) => {
 ```typescript
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import type { AITool } from 'tiptap-linter';
 
-const aiProvider = async (prompt: string, content: string) => {
-    const { text } = await generateText({
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
+    // Convert to Vercel AI SDK tool format
+    const aiTools = tools?.reduce((acc, t) => {
+        acc[t.function.name] = {
+            description: t.function.description,
+            parameters: t.function.parameters,
+        };
+        return acc;
+    }, {} as Record<string, unknown>);
+
+    const { toolCalls } = await generateText({
         model: openai('gpt-4'),
         system: prompt,
         prompt: content,
+        tools: aiTools,
+        toolChoice: { type: 'tool', toolName: 'report_lint_issues' },
     });
 
-    return JSON.parse(text);
-};
-```
-
-### OpenRouter
-
-```typescript
-const aiProvider = async (prompt: string, content: string) => {
-    const response = await fetch(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'HTTP-Referer': 'https://your-app.com',
-            },
-            body: JSON.stringify({
-                model: 'openai/gpt-4',
-                messages: [
-                    { role: 'system', content: prompt },
-                    { role: 'user', content },
-                ],
-            }),
-        }
-    );
-
-    const data = await response.json();
-    return JSON.parse(data.choices[0].message.content);
+    const call = toolCalls.find((c) => c.toolName === 'report_lint_issues');
+    if (call) {
+        return call.args as {
+            issues: Array<{
+                message: string;
+                textMatch: string;
+                suggestion?: string;
+            }>;
+        };
+    }
+    return { issues: [] };
 };
 ```
 
@@ -175,7 +273,6 @@ export class GrammarChecker extends AILinterPlugin {
     }
 
     async scan(): Promise<this> {
-        // Extract text with position mapping
         const { fullText, segments } = this.extractTextWithPositions();
 
         if (!fullText.trim()) {
@@ -183,13 +280,12 @@ export class GrammarChecker extends AILinterPlugin {
         }
 
         try {
-            // Call your AI provider
             const response = await this.config.provider(
                 this.config.systemPrompt || 'Check for grammar errors.',
                 fullText
+                // You can pass custom tools here if needed
             );
 
-            // Parse response and record issues
             this.parseAIResponse(response, segments, fullText);
         } catch (error) {
             console.error('Grammar check failed:', error);
@@ -198,14 +294,6 @@ export class GrammarChecker extends AILinterPlugin {
         return this;
     }
 }
-
-// Usage
-const grammarChecker = new GrammarChecker(doc, {
-    provider: aiProvider,
-    systemPrompt: `You are a grammar checker. Find grammar errors and return JSON:
-    {"issues": [{"message": "...", "textMatch": "...", "suggestion": "..."}]}`,
-    severity: 'error',
-});
 ```
 
 ### AILinterPlugin Methods
@@ -239,7 +327,7 @@ class AILinterPlugin extends LinterPlugin {
 
 ## AI Response Format
 
-The AI must return JSON in this format:
+The AI provider must return this structure (extracted from tool call arguments):
 
 ```typescript
 interface AIResponse {
@@ -251,42 +339,61 @@ interface AIResponse {
 }
 ```
 
-### Example Response
+### Tool Definition
 
-```json
+The linter provides this tool definition to your AI provider:
+
+```typescript
 {
-    "issues": [
-        {
-            "message": "Passive voice detected. Consider using active voice.",
-            "textMatch": "was written by the team",
-            "suggestion": "the team wrote"
-        },
-        {
-            "message": "Avoid using 'very' - it weakens your writing.",
-            "textMatch": "very important",
-            "suggestion": "crucial"
+    type: 'function',
+    function: {
+        name: 'report_lint_issues',
+        description: 'Report lint issues found in the text based on the rule provided',
+        parameters: {
+            type: 'object',
+            properties: {
+                issues: {
+                    type: 'array',
+                    description: 'Array of lint issues found in the text',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            message: {
+                                type: 'string',
+                                description: 'A clear explanation of what violates the rule'
+                            },
+                            textMatch: {
+                                type: 'string',
+                                description: 'The exact text that violates the rule (must match exactly)'
+                            },
+                            suggestion: {
+                                type: 'string',
+                                description: 'Optional suggested replacement text'
+                            }
+                        },
+                        required: ['message', 'textMatch']
+                    }
+                }
+            },
+            required: ['issues']
         }
-    ]
+    }
 }
 ```
 
-### System Prompt Template
+### Example Tool Call Response
 
-The `createNaturalLanguageRule()` function generates this system prompt:
-
-```
-You are a writing assistant that checks text for violations of the following rule:
-
-"[YOUR RULE HERE]"
-
-Analyze the provided text and identify any violations of this rule. For each violation found, respond with a JSON object containing an "issues" array. Each issue should have:
-- "message": A clear explanation of what violates the rule
-- "textMatch": The exact text that violates the rule (must match exactly as it appears in the document)
-- "suggestion": (optional) A suggested replacement text that would fix the violation
-
-If no violations are found, return: {"issues": []}
-
-Respond ONLY with valid JSON, no additional text.
+```json
+{
+    "tool_calls": [
+        {
+            "function": {
+                "name": "report_lint_issues",
+                "arguments": "{\"issues\": [{\"message\": \"Passive voice detected\", \"textMatch\": \"was written by the team\", \"suggestion\": \"the team wrote\"}]}"
+            }
+        }
+    ]
+}
 ```
 
 ## Best Practices
@@ -306,8 +413,8 @@ const NoJargon = createNaturalLanguageRule({
 ### 2. Choose Appropriate Models
 
 -   **GPT-4 / Claude 3 Opus**: Best accuracy, higher cost
--   **GPT-3.5 / Claude 3 Haiku**: Good balance of speed and accuracy
--   **Local models**: Privacy-focused, no API costs
+-   **GPT-4o-mini / Claude 3 Haiku**: Good balance of speed and accuracy
+-   Models must support tool/function calling
 
 ### 3. Keep Prompts Focused
 
@@ -322,18 +429,32 @@ const rule = 'Make the writing better.';
 ### 4. Handle Rate Limits
 
 ```typescript
-const aiProvider = async (prompt: string, content: string) => {
-  try {
-    const response = await openai.chat.completions.create({ ... });
-    return JSON.parse(response.choices[0].message.content!);
-  } catch (error) {
-    if (error.status === 429) {
-      // Rate limited - return empty issues
-      console.warn('Rate limited, skipping AI check');
-      return { issues: [] };
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
+    try {
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4',
+            messages: [
+                { role: 'system', content: prompt },
+                { role: 'user', content },
+            ],
+            tools,
+            tool_choice: {
+                type: 'function',
+                function: { name: 'report_lint_issues' },
+            },
+        });
+        // ... extract tool call result
+    } catch (error) {
+        if (error.status === 429) {
+            console.warn('Rate limited, skipping AI check');
+            return { issues: [] };
+        }
+        throw error;
     }
-    throw error;
-  }
 };
 ```
 
@@ -342,14 +463,18 @@ const aiProvider = async (prompt: string, content: string) => {
 ```typescript
 const cache = new Map<string, AIResponse>();
 
-const cachedProvider = async (prompt: string, content: string) => {
+const cachedProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
     const key = `${prompt}:${content}`;
 
     if (cache.has(key)) {
         return cache.get(key)!;
     }
 
-    const response = await aiProvider(prompt, content);
+    const response = await aiProvider(prompt, content, tools);
     cache.set(key, response);
 
     return response;
@@ -387,7 +512,6 @@ class RobustAIPlugin extends AILinterPlugin {
             );
             this.parseAIResponse(response, segments, fullText);
         } catch (error) {
-            // Log but don't crash
             console.error('AI plugin error:', error);
 
             // Optionally record a meta-issue
@@ -415,21 +539,35 @@ import {
     Punctuation,
     createNaturalLanguageRule,
 } from 'tiptap-linter';
+import type { AITool } from 'tiptap-linter';
 import OpenAI from 'openai';
 
 // Setup OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const aiProvider = async (prompt: string, content: string) => {
+const aiProvider = async (
+    prompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
     const response = await openai.chat.completions.create({
         model: 'gpt-4',
         messages: [
             { role: 'system', content: prompt },
             { role: 'user', content },
         ],
-        response_format: { type: 'json_object' },
+        tools,
+        tool_choice: {
+            type: 'function',
+            function: { name: 'report_lint_issues' },
+        },
     });
-    return JSON.parse(response.choices[0].message.content!);
+
+    const toolCall = response.choices[0].message.tool_calls?.[0];
+    if (toolCall?.function.name === 'report_lint_issues') {
+        return JSON.parse(toolCall.function.arguments);
+    }
+    return { issues: [] };
 };
 
 // Create AI rules

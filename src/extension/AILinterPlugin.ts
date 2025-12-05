@@ -66,7 +66,11 @@ export abstract class AILinterPlugin extends LinterPlugin {
                 textParts.push(node.text);
                 textOffset += node.text.length;
                 addedNewlineForBlock = false; // Reset flag after text node
-            } else if (node.isBlock && segments.length > 0 && !addedNewlineForBlock) {
+            } else if (
+                node.isBlock &&
+                segments.length > 0 &&
+                !addedNewlineForBlock
+            ) {
                 // Add newline for block boundaries to preserve structure
                 // Only add once per block to avoid duplicate newlines
                 textParts.push('\n');
@@ -98,7 +102,7 @@ export abstract class AILinterPlugin extends LinterPlugin {
         if (!textMatch || !segments || segments.length === 0 || !fullText) {
             return null;
         }
-        
+
         // Find the text match in the full text
         const textIndex = fullText.indexOf(textMatch);
         if (textIndex === -1) {
@@ -187,12 +191,33 @@ export abstract class AILinterPlugin extends LinterPlugin {
         try {
             // Validate response structure (Requirement 15.4)
             if (!response || typeof response !== 'object') {
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn(
+                        '[Tiptap Linter] AI response is not an object:',
+                        response
+                    );
+                }
                 return;
             }
 
             const typed = response as Partial<AIResponse>;
             if (!Array.isArray(typed.issues)) {
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn(
+                        '[Tiptap Linter] AI response has no issues array:',
+                        response
+                    );
+                }
                 return;
+            }
+
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(
+                    '[Tiptap Linter] Processing',
+                    typed.issues.length,
+                    'AI issues'
+                );
+                console.log('[Tiptap Linter] Full text:', fullText);
             }
 
             for (const issue of typed.issues) {
@@ -214,6 +239,13 @@ export abstract class AILinterPlugin extends LinterPlugin {
                     fullText
                 );
                 if (!position) {
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.warn(
+                            '[Tiptap Linter] Could not find text match:',
+                            JSON.stringify(issue.textMatch),
+                            'in document'
+                        );
+                    }
                     continue;
                 }
 
@@ -234,7 +266,10 @@ export abstract class AILinterPlugin extends LinterPlugin {
         } catch (error) {
             // Silently fail - no issues recorded (Requirement 15.4)
             if (process.env.NODE_ENV !== 'production') {
-                console.error('[Tiptap Linter] Failed to parse AI response:', error);
+                console.error(
+                    '[Tiptap Linter] Failed to parse AI response:',
+                    error
+                );
             }
         }
     }

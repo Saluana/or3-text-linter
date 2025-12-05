@@ -10,6 +10,17 @@ import { BadWords } from '../extension/plugins/BadWords';
 import { Punctuation } from '../extension/plugins/Punctuation';
 import { HeadingLevel } from '../extension/plugins/HeadingLevel';
 import IssuePopover from './components/IssuePopover.vue';
+import { OpenRouter } from '@openrouter/sdk';
+import { createNaturalLanguageRule } from '../factory/createNaturalLanguageRule';
+import type { AITool } from '../types';
+
+const STORAGE_KEY = 'openrouter_api_key';
+
+const getApiKey = (): string | null => {
+    return localStorage.getItem(STORAGE_KEY);
+};
+
+const openRouter = shallowRef<OpenRouter | null>(null);
 
 // Editor instance ref - using shallowRef as recommended for Tiptap
 const editor = shallowRef<Editor | null>(null);
@@ -24,7 +35,108 @@ const sampleContent = `
 <p>We evidently have multiple issues here !</p>
 `;
 
+const aiProvider = async (
+    systemPrompt: string,
+    content: string,
+    tools?: AITool[]
+) => {
+    if (!openRouter.value) {
+        throw new Error('OpenRouter not initialized');
+    }
+
+    const data = await openRouter.value.chat.send({
+        model: 'moonshotai/kimi-k2-0905:exacto',
+        messages: [
+            {
+                role: 'system',
+                content: systemPrompt,
+            },
+            {
+                role: 'user',
+                content,
+            },
+        ],
+        tools,
+        tool_choice: {
+            type: 'function',
+            function: { name: 'report_lint_issues' },
+        },
+        stream: false,
+    });
+
+    if (!data || !data.choices || !data.choices[0].message) {
+        throw new Error('No data returned from OpenRouter');
+    }
+
+    const message = data.choices[0].message;
+
+    console.log(data.choices[0].message);
+
+    // SDK returns toolCalls (camelCase), merge issues from all tool calls
+    const toolCalls = message.toolCalls ?? message.tool_calls;
+    if (toolCalls && toolCalls.length > 0) {
+        const allIssues: Array<{
+            message: string;
+            textMatch: string;
+            suggestion?: string;
+        }> = [];
+
+        for (const toolCall of toolCalls) {
+            if (toolCall.function.name === 'report_lint_issues') {
+                const result = JSON.parse(
+                    toolCall.function.arguments as string
+                );
+
+                console.log(result);
+
+                if (result.issues) {
+                    allIssues.push(...result.issues);
+                }
+            }
+        }
+
+        return { issues: allIssues };
+    }
+
+    // Fallback: try parsing from content if model didn't use tools
+    if (message.content && typeof message.content === 'string') {
+        const content = message.content.trim();
+        // Try to extract JSON from the content
+        const jsonMatch = content.match(/\{[\s\S]*"issues"[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                return JSON.parse(jsonMatch[0]);
+            } catch {
+                // Ignore parse errors
+            }
+        }
+    }
+
+    // Fallback: no issues found
+    return { issues: [] };
+};
+
+// Create a natural language rule
+const noVowels = createNaturalLanguageRule({
+    rule: 'Avoid using vowels. Vowels are banned from this editor.',
+    provider: aiProvider,
+    severity: 'warning',
+});
+
 onMounted(() => {
+    // Check for API key in localStorage
+    let apiKey = getApiKey();
+    if (!apiKey) {
+        apiKey = prompt('Please enter your OpenRouter API key:');
+        if (apiKey) {
+            localStorage.setItem(STORAGE_KEY, apiKey);
+        }
+    }
+
+    if (apiKey) {
+        openRouter.value = new OpenRouter({ apiKey });
+    }
+
     // Create Tiptap editor with Linter extension configured
     // Using Vue component for popover rendering
     editor.value = new Editor({
@@ -36,7 +148,7 @@ onMounted(() => {
             }),
             Text,
             Linter.configure({
-                plugins: [BadWords, Punctuation, HeadingLevel],
+                plugins: [BadWords, Punctuation, HeadingLevel, noVowels],
                 // Use Vue component for popover rendering
                 popover: {
                     vueComponent: {

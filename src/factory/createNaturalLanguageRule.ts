@@ -1,6 +1,11 @@
 import type { Node as ProsemirrorNode } from '@tiptap/pm/model';
 import { AILinterPlugin } from '../extension/AILinterPlugin';
-import type { AIProviderFn, Severity, AsyncLinterPluginClass } from '../types';
+import type {
+    AIProviderFn,
+    AITool,
+    Severity,
+    AsyncLinterPluginClass,
+} from '../types';
 
 /**
  * Configuration for creating a natural language lint rule.
@@ -31,15 +36,59 @@ function generateSystemPrompt(rule: string): string {
 
 "${rule}"
 
-Analyze the provided text and identify any violations of this rule. For each violation found, respond with a JSON object containing an "issues" array. Each issue should have:
-- "message": A clear explanation of what violates the rule
-- "textMatch": The exact text that violates the rule (must match exactly as it appears in the document)
-- "suggestion": (optional) A suggested replacement text that would fix the violation
+Analyze the provided text and identify any violations. Use the report_lint_issues tool to report your findings. For each violation:
+- message: A clear explanation of what violates the rule
+- textMatch: The EXACT text that violates the rule (must match exactly as it appears, character for character)
+- suggestion: (optional) A suggested replacement text
 
-If no violations are found, return: {"issues": []}
-
-Respond ONLY with valid JSON, no additional text.`;
+If no violations are found, call the tool with an empty issues array.`;
 }
+
+/**
+ * Tool definition for structured lint issue reporting.
+ * Using tool calling provides more reliable structured output than JSON in content.
+ */
+const LINT_TOOLS: AITool[] = [
+    {
+        type: 'function',
+        function: {
+            name: 'report_lint_issues',
+            description:
+                'Report lint issues found in the text based on the rule provided',
+            parameters: {
+                type: 'object',
+                properties: {
+                    issues: {
+                        type: 'array',
+                        description: 'Array of lint issues found in the text',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                message: {
+                                    type: 'string',
+                                    description:
+                                        'A clear explanation of what violates the rule',
+                                },
+                                textMatch: {
+                                    type: 'string',
+                                    description:
+                                        'The exact text that violates the rule (must match exactly as it appears)',
+                                },
+                                suggestion: {
+                                    type: 'string',
+                                    description:
+                                        'Optional suggested replacement text to fix the violation',
+                                },
+                            },
+                            required: ['message', 'textMatch'],
+                        },
+                    },
+                },
+                required: ['issues'],
+            },
+        },
+    },
+];
 
 /**
  * Factory function to create AI lint plugins from plain English descriptions.
@@ -53,15 +102,21 @@ Respond ONLY with valid JSON, no additional text.`;
  * ```typescript
  * const NoPassiveVoice = createNaturalLanguageRule({
  *   rule: "Avoid passive voice. Prefer active voice constructions.",
- *   provider: async (prompt, content) => {
+ *   provider: async (prompt, content, tools) => {
  *     const response = await openai.chat.completions.create({
  *       model: "gpt-4",
  *       messages: [
  *         { role: "system", content: prompt },
  *         { role: "user", content }
- *       ]
+ *       ],
+ *       tools,
+ *       tool_choice: { type: "function", function: { name: "report_lint_issues" } }
  *     });
- *     return JSON.parse(response.choices[0].message.content);
+ *     const toolCall = response.choices[0].message.tool_calls?.[0];
+ *     if (toolCall?.function.name === "report_lint_issues") {
+ *       return JSON.parse(toolCall.function.arguments);
+ *     }
+ *     return { issues: [] };
  *   },
  *   severity: 'warning'
  * });
@@ -104,10 +159,12 @@ export function createNaturalLanguageRule(
                 // Call the AI provider with the system prompt and document content
                 // Requirement 16.2: Send rule description and document text to AI provider
                 // Requirement 17.5: Use system prompt that instructs AI to find violations
-                const prompt = this.config.systemPrompt || generateSystemPrompt(rule);
+                const prompt =
+                    this.config.systemPrompt || generateSystemPrompt(rule);
                 const response = await this.config.provider(
                     prompt,
-                    fullText
+                    fullText,
+                    LINT_TOOLS
                 );
 
                 // Parse the AI response and record issues
@@ -115,7 +172,10 @@ export function createNaturalLanguageRule(
             } catch (error) {
                 // Silently fail - AI errors shouldn't crash the linter
                 if (process.env.NODE_ENV !== 'production') {
-                    console.error('[Tiptap Linter] Natural language rule scan failed:', error);
+                    console.error(
+                        '[Tiptap Linter] Natural language rule scan failed:',
+                        error
+                    );
                 }
             }
 

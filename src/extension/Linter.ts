@@ -151,21 +151,68 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
 
     addProseMirrorPlugins() {
         const extension = this;
+        let asyncRunId = 0; // Track async runs to avoid stale updates
+
+        // Helper to run async plugins and update decorations
+        const runAsyncPluginsAndUpdate = async (
+            doc: ProsemirrorNode,
+            runId: number
+        ) => {
+            const asyncIssues = await runAsyncPlugins(
+                doc,
+                extension.options.plugins
+            );
+
+            // Only update if this is still the latest run and editor exists
+            if (
+                runId === asyncRunId &&
+                extension.editor &&
+                asyncIssues.length > 0
+            ) {
+                // Merge with current sync issues
+                const currentSyncIssues = runSyncPlugins(
+                    extension.editor.state.doc,
+                    extension.options.plugins
+                );
+                const allIssues = [...currentSyncIssues, ...asyncIssues];
+                extension.storage.issues = allIssues;
+
+                // Force decoration update by dispatching a metadata transaction
+                const tr = extension.editor.state.tr.setMeta(
+                    'linterAsyncUpdate',
+                    true
+                );
+                extension.editor.view.dispatch(tr);
+            }
+        };
 
         return [
             new Plugin({
                 key: linterPluginKey,
                 state: {
                     init: (_, state) => {
-                        // Run plugins synchronously for initial state
+                        // Run sync plugins immediately for initial state
                         const issues = runSyncPlugins(
                             state.doc,
                             extension.options.plugins
                         );
                         extension.storage.issues = issues;
+
+                        // Kick off async plugins in background
+                        asyncRunId++;
+                        runAsyncPluginsAndUpdate(state.doc, asyncRunId);
+
                         return createDecorationSet(state.doc, issues);
                     },
                     apply: (tr, oldDecorations, _oldState, newState) => {
+                        // Handle async update - rebuild decorations from storage
+                        if (tr.getMeta('linterAsyncUpdate')) {
+                            return createDecorationSet(
+                                newState.doc,
+                                extension.storage.issues
+                            );
+                        }
+
                         // Reuse DecorationSet when document hasn't changed (Requirement 1.3)
                         if (!tr.docChanged) {
                             return oldDecorations;
@@ -177,6 +224,11 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
                             extension.options.plugins
                         );
                         extension.storage.issues = issues;
+
+                        // Kick off async plugins in background
+                        asyncRunId++;
+                        runAsyncPluginsAndUpdate(newState.doc, asyncRunId);
+
                         return createDecorationSet(newState.doc, issues);
                     },
                 },
@@ -236,12 +288,66 @@ function runSyncPlugins(
             allIssues.push(...plugin.getResults());
         } catch (error) {
             if (process.env.NODE_ENV !== 'production') {
-                console.error(`[Tiptap Linter] Plugin ${PluginClass.name} failed:`, error);
+                console.error(
+                    `[Tiptap Linter] Plugin ${PluginClass.name} failed:`,
+                    error
+                );
             }
         }
     }
 
     return allIssues;
+}
+
+/**
+ * Run all async linter plugins and collect issues
+ * @param doc - The ProseMirror document to scan
+ * @param plugins - Array of plugin classes to run
+ * @returns Promise resolving to array of issues from async plugins only
+ */
+async function runAsyncPlugins(
+    doc: ProsemirrorNode,
+    plugins: Array<LinterPluginClass | AsyncLinterPluginClass>
+): Promise<Issue[]> {
+    const asyncPromises: Promise<Issue[]>[] = [];
+
+    for (const PluginClass of plugins) {
+        try {
+            const plugin = new PluginClass(doc);
+            const result = plugin.scan();
+
+            // Only process async plugins
+            if (result instanceof Promise) {
+                asyncPromises.push(
+                    result
+                        .then(() => plugin.getResults())
+                        .catch((error) => {
+                            if (process.env.NODE_ENV !== 'production') {
+                                console.error(
+                                    `[Tiptap Linter] Async plugin ${PluginClass.name} failed:`,
+                                    error
+                                );
+                            }
+                            return [];
+                        })
+                );
+            }
+        } catch (error) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.error(
+                    `[Tiptap Linter] Plugin ${PluginClass.name} failed to initialize:`,
+                    error
+                );
+            }
+        }
+    }
+
+    if (asyncPromises.length === 0) {
+        return [];
+    }
+
+    const results = await Promise.all(asyncPromises);
+    return results.flat();
 }
 
 /**
@@ -265,7 +371,7 @@ export function createDecorationSet(
             }
             continue;
         }
-        
+
         // Create inline decoration with severity class (Requirements 1.4, 9.1)
         decorations.push(
             Decoration.inline(issue.from, issue.to, {
