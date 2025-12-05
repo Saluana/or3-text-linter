@@ -1,6 +1,6 @@
 {
-    "name": "tiptap-linter",
-    "version": "1.0.0",
+    "name": "or3-text-linter",
+    "version": "1.0.1",
     "description": "A comprehensive, extensible linting solution for Tiptap and ProseMirror editors with AI-powered rules and customizable popovers",
     "main": "./dist/index.js",
     "module": "./dist/index.js",
@@ -42,7 +42,7 @@
     },
     "homepage": "https://github.com/Saluana/or3-text-linter#readme",
     "scripts": {
-        "build": "tsc -p tsconfig.build.json",
+        "build": "vite build && tsc -p tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist",
         "prebuild": "npm run clean",
         "prepublishOnly": "npm run build && npm test",
@@ -65,6 +65,8 @@
     "dependencies": {},
     "devDependencies": {
         "@fast-check/vitest": "^0.2.3",
+        "@tiptap/core": "^2.1.0",
+        "@tiptap/pm": "^2.1.0",
         "@tiptap/extension-document": "^2.1.0",
         "@tiptap/extension-heading": "^2.1.0",
         "@tiptap/extension-paragraph": "^2.1.0",
