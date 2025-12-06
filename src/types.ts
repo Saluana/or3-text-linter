@@ -118,15 +118,13 @@ export interface AIResponse {
 /**
  * Configuration interface for AILinterPlugin.
  *
- * Requirements: 13.1, 14.1, 14.2, 14.3, 14.4
+ * Requirements: 13.1, 14.1, 14.2, 14.4
  */
 export interface AILinterPluginConfig {
     /** User-provided function that calls their chosen AI provider (Required) */
     provider: AIProviderFn;
     /** Custom system prompt for the AI (Optional - Requirement 14.2) */
     systemPrompt?: string;
-    /** Debounce timing in milliseconds to limit API calls (Optional - Requirement 14.3) */
-    debounceMs?: number;
     /** Default severity for issues found by this plugin (Optional) */
     severity?: Severity;
     /** What content to analyze: full document, selection, or changed ranges (Optional - Requirement 14.4) */

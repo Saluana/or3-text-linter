@@ -10,7 +10,7 @@ import type {
 /**
  * Configuration for creating a natural language lint rule.
  *
- * Requirements: 16.1, 17.1, 17.2, 17.3, 17.4
+ * Requirements: 16.1, 17.1, 17.2, 17.3
  */
 export interface NaturalLanguageRuleConfig {
     /** Plain English rule description (Required - Requirement 16.1) */
@@ -19,8 +19,6 @@ export interface NaturalLanguageRuleConfig {
     provider: AIProviderFn;
     /** Default severity for issues found by this rule (Optional - Requirement 17.3) */
     severity?: Severity;
-    /** Debounce timing in milliseconds to limit API calls (Optional - Requirement 17.4) */
-    debounceMs?: number;
 }
 
 /**
@@ -136,7 +134,7 @@ const LINT_TOOLS: AITool[] = [
 export function createNaturalLanguageRule(
     config: NaturalLanguageRuleConfig
 ): AsyncLinterPluginClass {
-    const { rule, provider, severity = 'warning', debounceMs } = config;
+    const { rule, provider, severity = 'warning' } = config;
     const systemPrompt = generateSystemPrompt(rule);
 
     /**
@@ -148,7 +146,6 @@ export function createNaturalLanguageRule(
                 provider,
                 systemPrompt,
                 severity,
-                debounceMs,
             });
         }
 

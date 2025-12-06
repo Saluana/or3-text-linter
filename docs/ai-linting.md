@@ -398,25 +398,11 @@ The linter provides this tool definition to your AI provider:
 
 ## Best Practices
 
-### 1. Use Debouncing
-
-Prevent excessive API calls with debouncing:
-
-```typescript
-const NoJargon = createNaturalLanguageRule({
-    rule: 'Avoid technical jargon. Use simple, clear language.',
-    provider: aiProvider,
-    debounceMs: 1000, // Wait 1 second after typing stops
-});
-```
-
-### 2. Choose Appropriate Models
+### 1. Choose Appropriate Models
 
 -   **GPT-4 / Claude 3 Opus**: Best accuracy, higher cost
 -   **GPT-4o-mini / Claude 3 Haiku**: Good balance of speed and accuracy
 -   Models must support tool/function calling
-
-### 3. Keep Prompts Focused
 
 ```typescript
 // ✅ Good - specific and focused
@@ -426,7 +412,7 @@ const rule = 'Sentences should not exceed 25 words.';
 const rule = 'Make the writing better.';
 ```
 
-### 4. Handle Rate Limits
+### 3. Handle Rate Limits
 
 ```typescript
 const aiProvider = async (
@@ -575,14 +561,12 @@ const NoPassiveVoice = createNaturalLanguageRule({
     rule: 'Avoid passive voice. Use active voice instead.',
     provider: aiProvider,
     severity: 'warning',
-    debounceMs: 1000,
 });
 
 const ClearLanguage = createNaturalLanguageRule({
     rule: 'Use clear, simple language. Avoid jargon and complex sentences.',
     provider: aiProvider,
     severity: 'info',
-    debounceMs: 1000,
 });
 
 // Create editor with all plugins

@@ -10,6 +10,7 @@ import type {
     PopoverOptions,
 } from '../types';
 import { PopoverManager } from './PopoverManager';
+import { AILinterPlugin } from './AILinterPlugin';
 
 /**
  * Extended HTMLDivElement interface for lint icons with attached issue data
@@ -403,22 +404,14 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
 });
 
 /**
- * Check if a plugin class is async by inspecting its prototype.
+ * Check if a plugin class is async by inspecting its prototype chain.
  * Async plugins extend AILinterPlugin which has an async scan() method.
+ * Uses isPrototypeOf which survives minification (unlike constructor.name).
  */
 function isAsyncPlugin(
     PluginClass: LinterPluginClass | AsyncLinterPluginClass
 ): boolean {
-    // Check if the scan method is marked as async or returns Promise
-    // We do this by checking the constructor name chain for AILinterPlugin
-    let proto = PluginClass.prototype;
-    while (proto && proto.constructor) {
-        if (proto.constructor.name === 'AILinterPlugin') {
-            return true;
-        }
-        proto = Object.getPrototypeOf(proto);
-    }
-    return false;
+    return AILinterPlugin.isPrototypeOf(PluginClass);
 }
 
 /**

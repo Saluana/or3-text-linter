@@ -1,3 +1,5 @@
+**WARNING**: This project is highly experimental and not production-ready. Things will change rapidly.
+
 # Tiptap Linter
 
 A comprehensive, extensible linting solution for [Tiptap](https://tiptap.dev/) and ProseMirror editors. Detect writing issues, enforce style guidelines, and provide automatic fixes—all with a beautiful, customizable UI.
@@ -325,8 +327,8 @@ Add these styles to customize the appearance:
 
 ### Prerequisites
 
-- Node.js 18+ or Bun
-- npm, yarn, or bun package manager
+-   Node.js 18+ or Bun
+-   npm, yarn, or bun package manager
 
 ### Setup
 
@@ -348,10 +350,10 @@ npm run build
 
 This project maintains strict code quality standards:
 
-- **TypeScript strict mode** enabled for maximum type safety
-- **ESLint** with zero-warnings policy - all code must pass linting
-- **No `any` types** - explicit typing required throughout the codebase
-- **Property-based testing** with fast-check for robust test coverage
+-   **TypeScript strict mode** enabled for maximum type safety
+-   **ESLint** with zero-warnings policy - all code must pass linting
+-   **No `any` types** - explicit typing required throughout the codebase
+-   **Property-based testing** with fast-check for robust test coverage
 
 Run `npm run lint` before committing to ensure your code meets quality standards.
 

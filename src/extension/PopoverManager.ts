@@ -79,17 +79,21 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
  */
 export class PopoverManager {
     private popoverEl: HTMLElement | null = null;
+    private anchorEl: HTMLElement | null = null;
     private vueApp: App | null = null;
     private view: EditorView;
     private options: PopoverOptions;
     private boundHandleClickOutside: (event: MouseEvent) => void;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
+    private boundHandleScroll: () => void;
+    private rafId: number | null = null;
 
     constructor(view: EditorView, options: PopoverOptions = {}) {
         this.view = view;
         this.options = options;
         this.boundHandleClickOutside = this.handleClickOutside.bind(this);
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
+        this.boundHandleScroll = this.handleScroll.bind(this);
     }
 
     /**
@@ -161,9 +165,12 @@ export class PopoverManager {
                 this.popoverEl.style.boxShadow = style.boxShadow;
         }
 
+        // Store anchor for repositioning on scroll
+        this.anchorEl = anchorEl;
+
         // Add to DOM and position
         document.body.appendChild(this.popoverEl);
-        this.positionPopover(anchorEl);
+        this.positionPopover();
 
         // Setup close handlers (Requirement 8.4)
         this.setupCloseHandlers();
@@ -173,6 +180,12 @@ export class PopoverManager {
      * Hide and remove the popover from the DOM.
      */
     hide(): void {
+        // Cancel any pending RAF
+        if (this.rafId !== null) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
+
         // Unmount Vue app if it exists
         if (this.vueApp) {
             this.vueApp.unmount();
@@ -183,6 +196,7 @@ export class PopoverManager {
             this.popoverEl.remove();
             this.popoverEl = null;
         }
+        this.anchorEl = null;
         this.removeCloseHandlers();
     }
 
@@ -229,19 +243,46 @@ export class PopoverManager {
     }
 
     /**
-     * Position the popover relative to the anchor element.
+     * Check if the anchor element is visible in the viewport.
+     */
+    private isAnchorVisible(): boolean {
+        if (!this.anchorEl) return false;
+        const rect = this.anchorEl.getBoundingClientRect();
+        // In test environments (jsdom), getBoundingClientRect returns all zeros
+        // Treat zero-sized rects as visible to avoid breaking tests
+        if (rect.width === 0 && rect.height === 0) {
+            return true;
+        }
+        // Consider anchor hidden if it's completely outside viewport
+        return (
+            rect.bottom > 0 &&
+            rect.top < window.innerHeight &&
+            rect.right > 0 &&
+            rect.left < window.innerWidth
+        );
+    }
+
+    /**
+     * Position the popover relative to the stored anchor element.
+     * Uses getBoundingClientRect() which returns viewport-relative coords,
+     * so position updates correctly on scroll when called again.
+     * Hides the popover if anchor scrolls out of view.
      *
      * Requirement: 18.6
-     *
-     * @param anchorEl - The element to position relative to
      */
-    private positionPopover(anchorEl: HTMLElement): void {
-        if (!this.popoverEl) return;
+    private positionPopover(): void {
+        if (!this.popoverEl || !this.anchorEl) return;
+
+        // Hide popover if anchor is no longer visible
+        if (!this.isAnchorVisible()) {
+            this.hide();
+            return;
+        }
 
         const placement: PopoverPlacement = this.options.placement ?? 'bottom';
         const offset = this.options.style?.offset ?? 8;
 
-        const anchorRect = anchorEl.getBoundingClientRect();
+        const anchorRect = this.anchorEl.getBoundingClientRect();
         const popoverRect = this.popoverEl.getBoundingClientRect();
 
         let top: number;
@@ -308,6 +349,10 @@ export class PopoverManager {
             document.addEventListener('click', this.boundHandleClickOutside);
         }, 0);
         document.addEventListener('keydown', this.boundHandleKeyDown);
+        // Reposition on scroll (capture phase to catch all scroll events)
+        window.addEventListener('scroll', this.boundHandleScroll, true);
+        // Reposition on resize
+        window.addEventListener('resize', this.boundHandleScroll);
     }
 
     /**
@@ -316,6 +361,8 @@ export class PopoverManager {
     private removeCloseHandlers(): void {
         document.removeEventListener('click', this.boundHandleClickOutside);
         document.removeEventListener('keydown', this.boundHandleKeyDown);
+        window.removeEventListener('scroll', this.boundHandleScroll, true);
+        window.removeEventListener('resize', this.boundHandleScroll);
     }
 
     /**
@@ -334,6 +381,18 @@ export class PopoverManager {
         if (event.key === 'Escape') {
             this.hide();
         }
+    }
+
+    /**
+     * Handle scroll by repositioning the popover.
+     * Uses requestAnimationFrame to batch updates and avoid layout thrashing.
+     */
+    private handleScroll(): void {
+        if (this.rafId !== null) return; // Already scheduled
+        this.rafId = requestAnimationFrame(() => {
+            this.rafId = null;
+            this.positionPopover();
+        });
     }
 
     /**

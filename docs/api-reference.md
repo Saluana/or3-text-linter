@@ -314,12 +314,11 @@ function createNaturalLanguageRule(
 
 ### NaturalLanguageRuleConfig
 
-| Property     | Type           | Required | Default     | Description                     |
-| ------------ | -------------- | -------- | ----------- | ------------------------------- |
-| `rule`       | `string`       | Yes      | -           | Plain English rule description  |
-| `provider`   | `AIProviderFn` | Yes      | -           | AI provider function            |
-| `severity`   | `Severity`     | No       | `'warning'` | Default severity for issues     |
-| `debounceMs` | `number`       | No       | -           | Debounce timing in milliseconds |
+| Property   | Type           | Required | Default     | Description                    |
+| ---------- | -------------- | -------- | ----------- | ------------------------------ |
+| `rule`     | `string`       | Yes      | -           | Plain English rule description |
+| `provider` | `AIProviderFn` | Yes      | -           | AI provider function           |
+| `severity` | `Severity`     | No       | `'warning'` | Default severity for issues    |
 
 ### Example
 
@@ -339,7 +338,6 @@ const NoPassiveVoice = createNaturalLanguageRule({
         return JSON.parse(response.choices[0].message.content!);
     },
     severity: 'warning',
-    debounceMs: 1000,
 });
 ```
 
@@ -507,7 +505,6 @@ interface AIResponse {
 interface AILinterPluginConfig {
     provider: AIProviderFn;
     systemPrompt?: string;
-    debounceMs?: number;
     severity?: Severity;
     contentScope?: 'full' | 'selection' | 'changed';
 }
