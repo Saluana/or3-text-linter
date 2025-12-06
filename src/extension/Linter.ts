@@ -60,6 +60,10 @@ export interface LinterStorage {
     popoverManager: PopoverManager | null;
     /** Debounce timer for async plugin runs */
     asyncDebounceTimer: ReturnType<typeof setTimeout> | null;
+    /** Flag to prevent multiple initial async runs */
+    hasScheduledInitialRun: boolean;
+    /** Last document text content hash to detect actual changes */
+    lastDocContentHash: string | null;
 }
 
 /**
@@ -141,6 +145,8 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
             },
             popoverManager: null as PopoverManager | null,
             asyncDebounceTimer: null as ReturnType<typeof setTimeout> | null,
+            hasScheduledInitialRun: false,
+            lastDocContentHash: null as string | null,
         };
     },
 
@@ -161,7 +167,6 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
         const extension = this;
         let asyncRunId = 0; // Track async runs to avoid stale updates
         let isAsyncRunning = false; // Prevent concurrent async runs
-        let hasScheduledInitialRun = false; // Prevent multiple initial runs
         const ASYNC_DEBOUNCE_MS = 2000; // Debounce async plugins by 2 seconds
 
         // Deduplicate issues by position (keep first occurrence at each position)
@@ -216,14 +221,25 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
             }
         };
 
+        // Simple hash function for document content
+        const hashContent = (content: string): string => {
+            let hash = 0;
+            for (let i = 0; i < content.length; i++) {
+                const char = content.charCodeAt(i);
+                hash = (hash << 5) - hash + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return hash.toString();
+        };
+
         // Debounced version to prevent excessive API calls
         const scheduleAsyncRun = (isInitial = false) => {
             // Prevent multiple initial runs (e.g., from HMR)
-            if (isInitial && hasScheduledInitialRun) {
+            if (isInitial && extension.storage.hasScheduledInitialRun) {
                 return;
             }
             if (isInitial) {
-                hasScheduledInitialRun = true;
+                extension.storage.hasScheduledInitialRun = true;
             }
 
             if (extension.storage.asyncDebounceTimer) {
@@ -232,7 +248,18 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
             asyncRunId++;
             const currentRunId = asyncRunId;
             extension.storage.asyncDebounceTimer = setTimeout(() => {
-                runAsyncPluginsAndUpdate(currentRunId);
+                // Check if document content actually changed before running async plugins
+                if (extension.editor) {
+                    const currentHash = hashContent(
+                        extension.editor.state.doc.textContent
+                    );
+                    if (extension.storage.lastDocContentHash === currentHash) {
+                        // Content hasn't changed, skip async run
+                        return;
+                    }
+                    extension.storage.lastDocContentHash = currentHash;
+                }
+                void runAsyncPluginsAndUpdate(currentRunId);
             }, ASYNC_DEBOUNCE_MS);
         };
 
@@ -376,6 +403,25 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
 });
 
 /**
+ * Check if a plugin class is async by inspecting its prototype.
+ * Async plugins extend AILinterPlugin which has an async scan() method.
+ */
+function isAsyncPlugin(
+    PluginClass: LinterPluginClass | AsyncLinterPluginClass
+): boolean {
+    // Check if the scan method is marked as async or returns Promise
+    // We do this by checking the constructor name chain for AILinterPlugin
+    let proto = PluginClass.prototype;
+    while (proto && proto.constructor) {
+        if (proto.constructor.name === 'AILinterPlugin') {
+            return true;
+        }
+        proto = Object.getPrototypeOf(proto);
+    }
+    return false;
+}
+
+/**
  * Run all sync linter plugins and collect issues
  * @param doc - The ProseMirror document to scan
  * @param plugins - Array of plugin classes to run
@@ -388,11 +434,17 @@ function runSyncPlugins(
     const allIssues: Issue[] = [];
 
     for (const PluginClass of plugins) {
+        // Skip async plugins entirely - don't even instantiate them
+        // This prevents the async scan() from being called
+        if (isAsyncPlugin(PluginClass)) {
+            continue;
+        }
+
         try {
             const plugin = new PluginClass(doc);
             const result = plugin.scan();
 
-            // Skip async plugins in sync context
+            // Double-check: skip if scan() returned a Promise anyway
             if (result instanceof Promise) {
                 continue;
             }

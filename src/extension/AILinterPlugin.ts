@@ -254,7 +254,7 @@ export abstract class AILinterPlugin extends LinterPlugin {
             }
 
             if (process.env.NODE_ENV !== 'production') {
-                console.log(
+                console.warn(
                     '[Tiptap Linter] Processing',
                     typed.issues.length,
                     'AI issues'

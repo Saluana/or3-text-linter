@@ -55,7 +55,11 @@ const wordArb = fc
 /**
  * Generator for severity
  */
-const severityArb: fc.Arbitrary<'info' | 'warning' | 'error'> = fc.constantFrom('info', 'warning', 'error');
+const severityArb: fc.Arbitrary<'info' | 'warning' | 'error'> = fc.constantFrom(
+    'info',
+    'warning',
+    'error'
+);
 
 describe('createNaturalLanguageRule Property Tests', () => {
     // **Feature: tiptap-linter, Property 17: Natural Language Rule Factory Output**
@@ -211,10 +215,7 @@ describe('createNaturalLanguageRule Property Tests', () => {
             // Property: System prompt should instruct AI to find violations
             expect(capturedPrompt).toMatch(/violation|rule/i);
 
-            // Property: System prompt should mention JSON response format
-            expect(capturedPrompt).toMatch(/json/i);
-
-            // Property: System prompt should mention issues array
+            // Property: System prompt should mention issues array (tool calling is used instead of JSON in content)
             expect(capturedPrompt).toMatch(/issues/i);
         }
     );
@@ -254,7 +255,7 @@ describe('createNaturalLanguageRule Property Tests', () => {
             });
 
             // Scan all plugins
-            await Promise.all(plugins.map(async (p) => await p.scan()));
+            await Promise.all(plugins.map((p) => Promise.resolve(p.scan())));
 
             // Collect all issues
             const allIssues = plugins.flatMap((p) => p.getResults());
@@ -270,6 +271,9 @@ describe('createNaturalLanguageRule Property Tests', () => {
     );
 
     // Test aggregation with varying issue counts per rule
+    // Note: Each rule uses a unique word, and multiple issues from the same rule
+    // targeting the same word will only record one issue (first occurrence)
+    // because they all map to the same document position.
     test.prop(
         [
             fc.array(fc.integer({ min: 0, max: 3 }), {
@@ -304,12 +308,15 @@ describe('createNaturalLanguageRule Property Tests', () => {
                 return new PluginClass(doc);
             });
 
-            await Promise.all(plugins.map(async (p) => await p.scan()));
+            await Promise.all(plugins.map((p) => Promise.resolve(p.scan())));
 
             const allIssues = plugins.flatMap((p) => p.getResults());
-            const expectedTotal = issueCounts.reduce((sum, c) => sum + c, 0);
 
-            // Property: Total issues should equal sum of all issue counts
+            // Each rule can only record issues up to the number of occurrences of its word in the doc.
+            // Since each uniqueWord appears exactly once, each rule can record at most 1 issue.
+            const expectedTotal = issueCounts.filter((c) => c > 0).length;
+
+            // Property: Total issues should equal number of rules that returned at least one issue
             expect(allIssues.length).toBe(expectedTotal);
         }
     );

@@ -49,7 +49,7 @@ export class HeadingLevel extends LinterPlugin {
                             `Heading level jumps from H${lastHeadingLevel} to H${currentLevel}. Expected H${expectedLevel}.`,
                             from,
                             to,
-                            'warning',
+                            'error',
                             fix
                         );
                     }

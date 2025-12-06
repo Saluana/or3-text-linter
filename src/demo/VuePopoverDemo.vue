@@ -115,14 +115,19 @@ const aiProvider = async (
 
         for (const toolCall of toolCalls) {
             if (toolCall.function.name === 'report_lint_issues') {
-                const result = JSON.parse(
-                    toolCall.function.arguments as string
-                );
+                try {
+                    const result = JSON.parse(
+                        toolCall.function.arguments as string
+                    );
 
-                console.log(result);
+                    console.log(result);
 
-                if (result.issues) {
-                    allIssues.push(...result.issues);
+                    if (result.issues) {
+                        allIssues.push(...result.issues);
+                    }
+                } catch {
+                    // Malformed JSON from AI - skip this tool call
+                    console.warn('[Demo] Failed to parse tool call arguments');
                 }
             }
         }
@@ -149,7 +154,7 @@ const aiProvider = async (
 };
 
 // Create a natural language rule
-const noVowels = createNaturalLanguageRule({
+const noDogs = createNaturalLanguageRule({
     rule: 'Avoid mentioning dogs, suggest cats instead.',
     provider: aiProvider,
     severity: 'warning',
@@ -180,7 +185,7 @@ onMounted(() => {
             }),
             Text,
             Linter.configure({
-                plugins: [BadWords, Punctuation, HeadingLevel, noVowels],
+                plugins: [BadWords, Punctuation, HeadingLevel, noDogs],
                 // Use Vue component for popover rendering
                 popover: {
                     vueComponent: {
@@ -201,6 +206,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     // Destroy editor instance on unmount
     editor.value?.destroy();
+    openRouter.value = null;
 });
 </script>
 

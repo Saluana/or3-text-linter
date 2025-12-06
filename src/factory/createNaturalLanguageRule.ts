@@ -194,5 +194,5 @@ export function createNaturalLanguageRule(
         }
     }
 
-    return NaturalLanguageRulePlugin as unknown as AsyncLinterPluginClass;
+    return NaturalLanguageRulePlugin as AsyncLinterPluginClass;
 }
