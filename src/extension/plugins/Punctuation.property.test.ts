@@ -41,25 +41,28 @@ function createMockEditorView(originalText: string): {
 } {
     let currentText = originalText;
 
+    // Create a chainable transaction mock
+    const createChainableTr = () => {
+        const tr = {
+            replaceWith: (from: number, to: number, node: { text: string }) => {
+                // Apply the replacement to currentText
+                currentText =
+                    currentText.slice(0, from) +
+                    node.text +
+                    currentText.slice(to);
+                return tr;
+            },
+            setMeta: () => tr,
+        };
+        return tr;
+    };
+
     const view = {
         state: {
             schema: {
                 text: (content: string) => ({ text: content }),
             },
-            tr: {
-                replaceWith: (
-                    from: number,
-                    to: number,
-                    node: { text: string }
-                ) => {
-                    // Apply the replacement to currentText
-                    currentText =
-                        currentText.slice(0, from) +
-                        node.text +
-                        currentText.slice(to);
-                    return view.state.tr;
-                },
-            },
+            tr: createChainableTr(),
         },
         dispatch: () => {},
     } as unknown as EditorView;

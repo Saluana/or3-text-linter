@@ -110,6 +110,8 @@ export interface AIResponse {
         textMatch: string;
         /** Optional replacement text for automatic fix */
         suggestion?: string;
+        /** Which occurrence of textMatch to highlight (0-indexed, default 0) */
+        occurrenceIndex?: number;
     }>;
 }
 

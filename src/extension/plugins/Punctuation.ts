@@ -68,11 +68,13 @@ export class Punctuation extends LinterPlugin {
     private createFix(punctuation: string) {
         return (view: EditorView, issue: Issue): void => {
             // Replace " ," with ", " (remove space before, add space after)
-            const tr = view.state.tr.replaceWith(
-                issue.from,
-                issue.to,
-                view.state.schema.text(punctuation + ' ')
-            );
+            const tr = view.state.tr
+                .replaceWith(
+                    issue.from,
+                    issue.to,
+                    view.state.schema.text(punctuation + ' ')
+                )
+                .setMeta('linterFix', true); // Mark as linter fix to preserve async issues
             view.dispatch(tr);
         };
     }

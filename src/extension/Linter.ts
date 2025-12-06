@@ -58,6 +58,8 @@ export interface LinterStorage {
     getIssues(): Issue[];
     /** PopoverManager instance for programmatic popover control */
     popoverManager: PopoverManager | null;
+    /** Debounce timer for async plugin runs */
+    asyncDebounceTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -138,10 +140,16 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
                 return this.issues;
             },
             popoverManager: null as PopoverManager | null,
+            asyncDebounceTimer: null as ReturnType<typeof setTimeout> | null,
         };
     },
 
     onDestroy() {
+        // Clean up debounce timer to prevent accessing destroyed editor
+        if (this.storage.asyncDebounceTimer) {
+            clearTimeout(this.storage.asyncDebounceTimer);
+            this.storage.asyncDebounceTimer = null;
+        }
         // Clean up PopoverManager when extension is destroyed to prevent memory leaks
         if (this.storage.popoverManager) {
             this.storage.popoverManager.hide();
@@ -152,38 +160,80 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
     addProseMirrorPlugins() {
         const extension = this;
         let asyncRunId = 0; // Track async runs to avoid stale updates
+        let isAsyncRunning = false; // Prevent concurrent async runs
+        let hasScheduledInitialRun = false; // Prevent multiple initial runs
+        const ASYNC_DEBOUNCE_MS = 2000; // Debounce async plugins by 2 seconds
+
+        // Deduplicate issues by position (keep first occurrence at each position)
+        const deduplicateIssues = (issues: Issue[]): Issue[] => {
+            const seen = new Set<string>();
+            return issues.filter((issue) => {
+                const key = `${issue.from}-${issue.to}`;
+                if (seen.has(key)) {
+                    return false;
+                }
+                seen.add(key);
+                return true;
+            });
+        };
 
         // Helper to run async plugins and update decorations
-        const runAsyncPluginsAndUpdate = async (
-            doc: ProsemirrorNode,
-            runId: number
-        ) => {
-            const asyncIssues = await runAsyncPlugins(
-                doc,
-                extension.options.plugins
-            );
+        const runAsyncPluginsAndUpdate = async (runId: number) => {
+            // Prevent concurrent runs
+            if (isAsyncRunning) return;
+            if (!extension.editor) return;
 
-            // Only update if this is still the latest run and editor exists
-            if (
-                runId === asyncRunId &&
-                extension.editor &&
-                asyncIssues.length > 0
-            ) {
-                // Merge with current sync issues
-                const currentSyncIssues = runSyncPlugins(
-                    extension.editor.state.doc,
+            isAsyncRunning = true;
+            try {
+                const doc = extension.editor.state.doc;
+                const asyncIssues = await runAsyncPlugins(
+                    doc,
                     extension.options.plugins
                 );
-                const allIssues = [...currentSyncIssues, ...asyncIssues];
-                extension.storage.issues = allIssues;
 
-                // Force decoration update by dispatching a metadata transaction
-                const tr = extension.editor.state.tr.setMeta(
-                    'linterAsyncUpdate',
-                    true
-                );
-                extension.editor.view.dispatch(tr);
+                // Only update if this is still the latest run and editor exists
+                if (runId === asyncRunId && extension.editor) {
+                    // Merge with current sync issues and deduplicate
+                    const currentSyncIssues = runSyncPlugins(
+                        extension.editor.state.doc,
+                        extension.options.plugins
+                    );
+                    const allIssues = deduplicateIssues([
+                        ...currentSyncIssues,
+                        ...asyncIssues,
+                    ]);
+                    extension.storage.issues = allIssues;
+
+                    // Force decoration update by dispatching a metadata transaction
+                    const tr = extension.editor.state.tr.setMeta(
+                        'linterAsyncUpdate',
+                        true
+                    );
+                    extension.editor.view.dispatch(tr);
+                }
+            } finally {
+                isAsyncRunning = false;
             }
+        };
+
+        // Debounced version to prevent excessive API calls
+        const scheduleAsyncRun = (isInitial = false) => {
+            // Prevent multiple initial runs (e.g., from HMR)
+            if (isInitial && hasScheduledInitialRun) {
+                return;
+            }
+            if (isInitial) {
+                hasScheduledInitialRun = true;
+            }
+
+            if (extension.storage.asyncDebounceTimer) {
+                clearTimeout(extension.storage.asyncDebounceTimer);
+            }
+            asyncRunId++;
+            const currentRunId = asyncRunId;
+            extension.storage.asyncDebounceTimer = setTimeout(() => {
+                runAsyncPluginsAndUpdate(currentRunId);
+            }, ASYNC_DEBOUNCE_MS);
         };
 
         return [
@@ -198,9 +248,8 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
                         );
                         extension.storage.issues = issues;
 
-                        // Kick off async plugins in background
-                        asyncRunId++;
-                        runAsyncPluginsAndUpdate(state.doc, asyncRunId);
+                        // Schedule async plugins (debounced, marked as initial to prevent HMR duplicates)
+                        scheduleAsyncRun(true);
 
                         return createDecorationSet(state.doc, issues);
                     },
@@ -218,18 +267,81 @@ export const Linter = Extension.create<LinterOptions, LinterStorage>({
                             return oldDecorations;
                         }
 
-                        // Rebuild DecorationSet when document changed (Requirement 1.2)
-                        const issues = runSyncPlugins(
+                        // Check if this is a linter fix - skip async re-run to save API calls
+                        const isLinterFix = tr.getMeta('linterFix');
+
+                        // Get fresh sync issues
+                        const syncIssues = runSyncPlugins(
                             newState.doc,
                             extension.options.plugins
                         );
-                        extension.storage.issues = issues;
 
-                        // Kick off async plugins in background
-                        asyncRunId++;
-                        runAsyncPluginsAndUpdate(newState.doc, asyncRunId);
+                        if (isLinterFix) {
+                            // Cancel any pending async run to prevent wasting API calls
+                            if (extension.storage.asyncDebounceTimer) {
+                                clearTimeout(
+                                    extension.storage.asyncDebounceTimer
+                                );
+                                extension.storage.asyncDebounceTimer = null;
+                            }
+                            // For linter fixes: keep existing async issues but adjust positions
+                            // and remove issues that were directly affected by the fix
+                            const existingAsyncIssues: Issue[] = [];
 
-                        return createDecorationSet(newState.doc, issues);
+                            // Get the ranges that were modified by this transaction
+                            const modifiedRanges: Array<{
+                                from: number;
+                                to: number;
+                            }> = [];
+                            tr.steps.forEach((_step, i) => {
+                                const map = tr.mapping.maps[i];
+                                map.forEach(
+                                    (oldStart: number, oldEnd: number) => {
+                                        modifiedRanges.push({
+                                            from: oldStart,
+                                            to: oldEnd,
+                                        });
+                                    }
+                                );
+                            });
+
+                            for (const issue of extension.storage.issues) {
+                                // Check if this issue overlaps with any modified range
+                                const wasModified = modifiedRanges.some(
+                                    (range) =>
+                                        issue.from < range.to &&
+                                        issue.to > range.from
+                                );
+                                if (wasModified) continue;
+
+                                // Map positions to new document
+                                const newFrom = tr.mapping.map(issue.from);
+                                const newTo = tr.mapping.map(issue.to);
+
+                                // Skip if positions are invalid
+                                if (newFrom >= newTo) continue;
+                                if (newTo > newState.doc.content.size) continue;
+
+                                // Create a new issue object with updated positions
+                                existingAsyncIssues.push({
+                                    ...issue,
+                                    from: newFrom,
+                                    to: newTo,
+                                });
+                            }
+
+                            const allIssues = deduplicateIssues([
+                                ...syncIssues,
+                                ...existingAsyncIssues,
+                            ]);
+                            extension.storage.issues = allIssues;
+                            return createDecorationSet(newState.doc, allIssues);
+                        }
+
+                        // Normal edit: run async plugins after debounce
+                        extension.storage.issues = syncIssues;
+                        scheduleAsyncRun();
+                        return createDecorationSet(newState.doc, syncIssues);
                     },
                 },
                 props: {

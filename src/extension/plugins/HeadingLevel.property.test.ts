@@ -42,19 +42,26 @@ function createMockEditorView(): {
     let appliedLevel: number | null = null;
     let appliedPos: number | null = null;
 
+    // Create a chainable transaction mock
+    const createChainableTr = () => {
+        const tr = {
+            setNodeMarkup: (
+                pos: number,
+                _type: unknown,
+                attrs: { level: number }
+            ) => {
+                appliedPos = pos;
+                appliedLevel = attrs.level;
+                return tr;
+            },
+            setMeta: () => tr,
+        };
+        return tr;
+    };
+
     const view = {
         state: {
-            tr: {
-                setNodeMarkup: (
-                    pos: number,
-                    _type: unknown,
-                    attrs: { level: number }
-                ) => {
-                    appliedPos = pos;
-                    appliedLevel = attrs.level;
-                    return view.state.tr;
-                },
-            },
+            tr: createChainableTr(),
         },
         dispatch: () => {},
     } as unknown as EditorView;

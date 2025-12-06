@@ -27,12 +27,44 @@ const editor = shallowRef<Editor | null>(null);
 
 // Sample content with known issues for demonstration
 const sampleContent = `
-<h1>Introduction</h1>
-<p>This is obviously a demonstration of the linter extension. It clearly shows how the linter works .</p>
-<h3>Skipped Heading Level</h3>
-<p>This heading simply jumped from H1 to H3 , which is a problem!</p>
-<h4>Another Skip</h4>
-<p>We evidently have multiple issues here !</p>
+<h1>How to Walk Your Dog: A Complete Guide</h1>
+
+<p>Walking your dog is obviously one of the most important things you can do for your furry friend . It provides essential exercise , mental stimulation , and bonding time. This guide will clearly help you master the art of dog walking .</p>
+
+<h2>Getting Ready for the Walk</h2>
+
+<p>Before heading out , you simply need to gather a few essential items. Make sure you have:</p>
+
+<ul>
+<li>A sturdy leash (4-6 feet is ideal)</li>
+<li>Waste bags for cleanup</li>
+<li>Fresh water and a portable bowl</li>
+<li>Treats for positive reinforcement</li>
+</ul>
+
+<p>Its also important to check the weather conditions . On hot days , the pavement can evidently burn your dogs paws , so test it with your hand first .</p>
+
+<h4>Choosing the Right Time</h4>
+
+<p>The best times for walking are early morning or late evening when temperatures are cooler . Avoid the midday sun , especially during summer months. Your dog will definately thank you for this consideration !</p>
+
+<h2>During the Walk</h2>
+
+<p>Keep your dog on a loose leash and let them sniff around - this is there way of exploring the world . However , maintain control and be aware of your surroundings. Watch out for:</p>
+
+<ul>
+<li>Other dogs that might be agressive</li>
+<li>Traffic and busy intersections</li>
+<li>Potential hazards like broken glass</li>
+</ul>
+
+<h6>Training Tips</h6>
+
+<p>If your dog pulls on the leash , stop walking immediatly and wait for them to calm down. Reward good behaviour with treats and praise. Consistancy is key to developing good walking habits .</p>
+
+<h2>After the Walk</h2>
+
+<p>When you return home , check your dogs paws for any cuts or debris. Provide fresh water and let them rest. A tired dog is a happy dog , and regular walks will keep your companion healthy and well-behaved for years to come !</p>
 `;
 
 const aiProvider = async (
@@ -118,7 +150,7 @@ const aiProvider = async (
 
 // Create a natural language rule
 const noVowels = createNaturalLanguageRule({
-    rule: 'Avoid using vowels. Vowels are banned from this editor.',
+    rule: 'Avoid mentioning dogs, suggest cats instead.',
     provider: aiProvider,
     severity: 'warning',
 });

@@ -32,16 +32,22 @@ export interface NaturalLanguageRuleConfig {
  * @returns System prompt string for the AI
  */
 function generateSystemPrompt(rule: string): string {
-    return `You are a writing assistant that checks text for violations of the following rule:
+    return `You are a precise text linter. Check the text for violations of this rule:
 
 "${rule}"
 
-Analyze the provided text and identify any violations. Use the report_lint_issues tool to report your findings. For each violation:
-- message: A clear explanation of what violates the rule
-- textMatch: The EXACT text that violates the rule (must match exactly as it appears, character for character)
-- suggestion: (optional) A suggested replacement text
+CRITICAL REQUIREMENTS:
+1. Report EACH violation separately - do NOT combine multiple violations into one issue
+2. textMatch MUST be copied EXACTLY from the input text (character-for-character, including punctuation and spacing)
+3. textMatch should be the minimal text that violates the rule (e.g., just "your dog" not the whole sentence)
+4. suggestion should be a direct replacement for textMatch only
+5. If the same text appears multiple times, use occurrenceIndex (0-indexed) to specify which one
 
-If no violations are found, call the tool with an empty issues array.`;
+Example - if the rule is "avoid mentioning dogs" and text contains "Walk your dog. Feed your dog.":
+- First occurrence: textMatch="your dog", occurrenceIndex=0, suggestion="your cat"
+- Second occurrence: textMatch="your dog", occurrenceIndex=1, suggestion="your cat"
+
+If no violations found, report empty issues array.`;
 }
 
 /**
@@ -78,6 +84,11 @@ const LINT_TOOLS: AITool[] = [
                                     type: 'string',
                                     description:
                                         'Optional suggested replacement text to fix the violation',
+                                },
+                                occurrenceIndex: {
+                                    type: 'number',
+                                    description:
+                                        'Which occurrence of textMatch to highlight (0-indexed). Use when the same text appears multiple times. Default is 0 (first occurrence).',
                                 },
                             },
                             required: ['message', 'textMatch'],

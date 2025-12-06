@@ -84,6 +84,45 @@ export abstract class AILinterPlugin extends LinterPlugin {
     }
 
     /**
+     * Find the nth occurrence of a text match in the document.
+     *
+     * @param textMatch - The text to find
+     * @param segments - The text segments from extractTextWithPositions()
+     * @param fullText - The full extracted text
+     * @param occurrenceIndex - Which occurrence to find (0-indexed)
+     * @returns Position object with from/to, or null if not found
+     */
+    protected findNthOccurrence(
+        textMatch: string,
+        segments: TextSegment[],
+        fullText: string,
+        occurrenceIndex: number
+    ): { from: number; to: number } | null {
+        let currentIndex = 0;
+        let searchFrom = 0;
+
+        while (currentIndex <= occurrenceIndex) {
+            const position = this.findTextPosition(
+                textMatch,
+                segments,
+                fullText,
+                searchFrom
+            );
+            if (!position) {
+                return null;
+            }
+            if (currentIndex === occurrenceIndex) {
+                return position;
+            }
+            // Move past this occurrence
+            const textIndex = fullText.indexOf(textMatch, searchFrom);
+            searchFrom = textIndex + textMatch.length;
+            currentIndex++;
+        }
+        return null;
+    }
+
+    /**
      * Find the ProseMirror position of a text match in the document.
      *
      * Requirement 15.2: Map text offsets to ProseMirror positions
@@ -91,20 +130,22 @@ export abstract class AILinterPlugin extends LinterPlugin {
      * @param textMatch - The text to find in the document
      * @param segments - The text segments from extractTextWithPositions()
      * @param fullText - The full extracted text
+     * @param startFromIndex - Optional index to start searching from (for finding subsequent occurrences)
      * @returns Position object with from/to, or null if not found
      */
     protected findTextPosition(
         textMatch: string,
         segments: TextSegment[],
-        fullText: string
+        fullText: string,
+        startFromIndex = 0
     ): { from: number; to: number } | null {
         // Validate inputs
         if (!textMatch || !segments || segments.length === 0 || !fullText) {
             return null;
         }
 
-        // Find the text match in the full text
-        const textIndex = fullText.indexOf(textMatch);
+        // Find the text match in the full text, starting from the given index
+        const textIndex = fullText.indexOf(textMatch, startFromIndex);
         if (textIndex === -1) {
             return null;
         }
@@ -163,13 +204,14 @@ export abstract class AILinterPlugin extends LinterPlugin {
      */
     protected createTextFix(replacement: string): FixFn {
         return (view: EditorView, issue: Issue) => {
-            view.dispatch(
-                view.state.tr.replaceWith(
+            const tr = view.state.tr
+                .replaceWith(
                     issue.from,
                     issue.to,
                     view.state.schema.text(replacement)
                 )
-            );
+                .setMeta('linterFix', true); // Mark as linter fix to skip async re-run
+            view.dispatch(tr);
         };
     }
 
@@ -217,8 +259,10 @@ export abstract class AILinterPlugin extends LinterPlugin {
                     typed.issues.length,
                     'AI issues'
                 );
-                console.log('[Tiptap Linter] Full text:', fullText);
             }
+
+            // Track used occurrences for each textMatch when AI doesn't provide occurrenceIndex
+            const usedOccurrences = new Map<string, number>();
 
             for (const issue of typed.issues) {
                 // Skip malformed issues
@@ -232,17 +276,32 @@ export abstract class AILinterPlugin extends LinterPlugin {
                     continue;
                 }
 
-                // Find position in document
-                const position = this.findTextPosition(
+                // Determine which occurrence to find
+                let targetOccurrence: number;
+                if (typeof issue.occurrenceIndex === 'number') {
+                    // AI specified which occurrence
+                    targetOccurrence = issue.occurrenceIndex;
+                } else {
+                    // Auto-increment: use next unused occurrence
+                    targetOccurrence =
+                        usedOccurrences.get(issue.textMatch) ?? 0;
+                    usedOccurrences.set(issue.textMatch, targetOccurrence + 1);
+                }
+
+                // Find the nth occurrence of textMatch
+                const position = this.findNthOccurrence(
                     issue.textMatch,
                     segments,
-                    fullText
+                    fullText,
+                    targetOccurrence
                 );
                 if (!position) {
                     if (process.env.NODE_ENV !== 'production') {
                         console.warn(
                             '[Tiptap Linter] Could not find text match:',
                             JSON.stringify(issue.textMatch),
+                            'occurrence',
+                            targetOccurrence,
                             'in document'
                         );
                     }
@@ -254,7 +313,6 @@ export abstract class AILinterPlugin extends LinterPlugin {
                     ? this.createTextFix(issue.suggestion)
                     : undefined;
 
-                // Record the issue with configured severity
                 this.record(
                     issue.message,
                     position.from,

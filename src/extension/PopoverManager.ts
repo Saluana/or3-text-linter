@@ -44,7 +44,10 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
             const fixBtn = document.createElement('button');
             fixBtn.className = 'lint-popover__btn lint-popover__btn--fix';
             fixBtn.textContent = 'Fix';
-            fixBtn.setAttribute('aria-label', `Apply fix for: ${issue.message}`);
+            fixBtn.setAttribute(
+                'aria-label',
+                `Apply fix for: ${issue.message}`
+            );
             fixBtn.setAttribute('type', 'button');
             fixBtn.onclick = () => context.actions.applyFix();
             actions.appendChild(fixBtn);
@@ -53,7 +56,10 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
         const dismissBtn = document.createElement('button');
         dismissBtn.className = 'lint-popover__btn lint-popover__btn--dismiss';
         dismissBtn.textContent = 'Dismiss';
-        dismissBtn.setAttribute('aria-label', `Dismiss lint issue: ${issue.message}`);
+        dismissBtn.setAttribute(
+            'aria-label',
+            `Dismiss lint issue: ${issue.message}`
+        );
         dismissBtn.setAttribute('type', 'button');
         dismissBtn.onclick = () => context.actions.dismiss();
         actions.appendChild(dismissBtn);
@@ -98,18 +104,22 @@ export class PopoverManager {
         // Validate inputs
         if (!issues || !Array.isArray(issues) || issues.length === 0) {
             if (process.env.NODE_ENV !== 'production') {
-                console.warn('[Tiptap Linter] PopoverManager.show() called with invalid issues array');
+                console.warn(
+                    '[Tiptap Linter] PopoverManager.show() called with invalid issues array'
+                );
             }
             return;
         }
-        
+
         if (!anchorEl || !(anchorEl instanceof HTMLElement)) {
             if (process.env.NODE_ENV !== 'production') {
-                console.warn('[Tiptap Linter] PopoverManager.show() called with invalid anchor element');
+                console.warn(
+                    '[Tiptap Linter] PopoverManager.show() called with invalid anchor element'
+                );
             }
             return;
         }
-        
+
         // Close any existing popover first
         this.hide();
 
@@ -135,7 +145,7 @@ export class PopoverManager {
             const renderer = this.options.renderer ?? createDefaultPopover;
             this.popoverEl = renderer(context);
         }
-        
+
         this.popoverEl.classList.add('lint-popover-container');
 
         // Apply custom styles if provided
@@ -168,7 +178,7 @@ export class PopoverManager {
             this.vueApp.unmount();
             this.vueApp = null;
         }
-        
+
         if (this.popoverEl) {
             this.popoverEl.remove();
             this.popoverEl = null;
@@ -192,7 +202,7 @@ export class PopoverManager {
      */
     private renderVueComponent(context: PopoverContext): HTMLElement {
         const container = document.createElement('div');
-        
+
         if (!this.options.vueComponent) {
             return container;
         }
@@ -353,8 +363,15 @@ export class PopoverManager {
      */
     private deleteText(issues: Issue[]): void {
         const issue = issues[0];
-        if (issue && issue.from >= 0 && issue.to <= this.view.state.doc.content.size) {
-            this.view.dispatch(this.view.state.tr.delete(issue.from, issue.to));
+        if (
+            issue &&
+            issue.from >= 0 &&
+            issue.to <= this.view.state.doc.content.size
+        ) {
+            const tr = this.view.state.tr
+                .delete(issue.from, issue.to)
+                .setMeta('linterFix', true); // Mark as linter fix to skip async re-run
+            this.view.dispatch(tr);
             this.view.focus();
         }
         this.hide();
@@ -371,14 +388,19 @@ export class PopoverManager {
      */
     private replaceText(issues: Issue[], newText: string): void {
         const issue = issues[0];
-        if (issue && issue.from >= 0 && issue.to <= this.view.state.doc.content.size) {
-            this.view.dispatch(
-                this.view.state.tr.replaceWith(
+        if (
+            issue &&
+            issue.from >= 0 &&
+            issue.to <= this.view.state.doc.content.size
+        ) {
+            const tr = this.view.state.tr
+                .replaceWith(
                     issue.from,
                     issue.to,
                     this.view.state.schema.text(newText)
                 )
-            );
+                .setMeta('linterFix', true); // Mark as linter fix to skip async re-run
+            this.view.dispatch(tr);
             this.view.focus();
         }
         this.hide();

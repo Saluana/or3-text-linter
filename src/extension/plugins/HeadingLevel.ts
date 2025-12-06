@@ -70,9 +70,11 @@ export class HeadingLevel extends LinterPlugin {
     private createFix(nodePos: number, expectedLevel: number) {
         return (view: EditorView, _issue: Issue): void => {
             // Use setNodeMarkup to change the heading level (Requirement 7.4)
-            const tr = view.state.tr.setNodeMarkup(nodePos, undefined, {
-                level: expectedLevel,
-            });
+            const tr = view.state.tr
+                .setNodeMarkup(nodePos, undefined, {
+                    level: expectedLevel,
+                })
+                .setMeta('linterFix', true); // Mark as linter fix to preserve async issues
             view.dispatch(tr);
         };
     }
