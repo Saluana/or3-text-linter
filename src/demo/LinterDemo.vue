@@ -72,6 +72,12 @@ function customPopoverRenderer(context: PopoverContext): HTMLElement {
             actions.appendChild(fixBtn);
         }
 
+        const ignoreBtn = document.createElement('button');
+        ignoreBtn.className = 'lint-popover__btn lint-popover__btn--ignore';
+        ignoreBtn.textContent = '🚫 Ignore';
+        ignoreBtn.onclick = () => context.actions.ignore();
+        actions.appendChild(ignoreBtn);
+
         const dismissBtn = document.createElement('button');
         dismissBtn.className = 'lint-popover__btn lint-popover__btn--dismiss';
         dismissBtn.textContent = '✕ Dismiss';
@@ -427,6 +433,18 @@ onBeforeUnmount(() => {
 .editor-content :deep(.lint-popover__btn--fix:hover) {
     background-color: #2563eb;
     border-color: #2563eb;
+}
+
+/* Ignore button styles */
+.editor-content :deep(.lint-popover__btn--ignore) {
+    background-color: #fef3c7;
+    color: #92400e;
+    border-color: #fcd34d;
+}
+
+.editor-content :deep(.lint-popover__btn--ignore:hover) {
+    background-color: #fde68a;
+    border-color: #f59e0b;
 }
 
 /* Dismiss button styles */

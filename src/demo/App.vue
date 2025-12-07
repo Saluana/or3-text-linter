@@ -2,8 +2,9 @@
 import { ref } from 'vue';
 import LinterDemo from './LinterDemo.vue';
 import VuePopoverDemo from './VuePopoverDemo.vue';
+import OnDemandDemo from './OnDemandDemo.vue';
 
-const activeDemo = ref<'renderer' | 'vue'>('vue');
+const activeDemo = ref<'ondemand' | 'vue' | 'renderer'>('ondemand');
 </script>
 
 <template>
@@ -16,6 +17,12 @@ const activeDemo = ref<'renderer' | 'vue'>('vue');
         </header>
 
         <nav class="nav">
+            <button
+                :class="['nav-btn', { active: activeDemo === 'ondemand' }]"
+                @click="activeDemo = 'ondemand'"
+            >
+                On-Demand Features
+            </button>
             <button
                 :class="['nav-btn', { active: activeDemo === 'vue' }]"
                 @click="activeDemo = 'vue'"
@@ -31,7 +38,8 @@ const activeDemo = ref<'renderer' | 'vue'>('vue');
         </nav>
 
         <main class="main">
-            <VuePopoverDemo v-if="activeDemo === 'vue'" />
+            <OnDemandDemo v-if="activeDemo === 'ondemand'" />
+            <VuePopoverDemo v-else-if="activeDemo === 'vue'" />
             <LinterDemo v-else />
         </main>
 

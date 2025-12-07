@@ -30,7 +30,10 @@ function getSeverityEmoji(severity: string): string {
         <div
             v-for="(issue, index) in issues"
             :key="index"
-            :class="['vue-popover__issue', `vue-popover__issue--${issue.severity}`]"
+            :class="[
+                'vue-popover__issue',
+                `vue-popover__issue--${issue.severity}`,
+            ]"
         >
             <div class="vue-popover__header">
                 <span class="vue-popover__emoji">{{
@@ -48,6 +51,12 @@ function getSeverityEmoji(severity: string): string {
                     @click="actions.applyFix()"
                 >
                     ✨ Fix it
+                </button>
+                <button
+                    class="vue-popover__btn vue-popover__btn--ignore"
+                    @click="actions.ignore()"
+                >
+                    🚫 Ignore
                 </button>
                 <button
                     class="vue-popover__btn vue-popover__btn--dismiss"
@@ -143,6 +152,17 @@ function getSeverityEmoji(severity: string): string {
 .vue-popover__btn--fix:hover {
     background-color: #2563eb;
     border-color: #2563eb;
+}
+
+.vue-popover__btn--ignore {
+    background-color: #fef3c7;
+    color: #92400e;
+    border-color: #fcd34d;
+}
+
+.vue-popover__btn--ignore:hover {
+    background-color: #fde68a;
+    border-color: #f59e0b;
 }
 
 .vue-popover__btn--dismiss {
