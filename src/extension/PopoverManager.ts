@@ -53,6 +53,18 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
             actions.appendChild(fixBtn);
         }
 
+        // Ignore button - adds issue to ignored list (Requirement 9.1)
+        const ignoreBtn = document.createElement('button');
+        ignoreBtn.className = 'lint-popover__btn lint-popover__btn--ignore';
+        ignoreBtn.textContent = 'Ignore';
+        ignoreBtn.setAttribute(
+            'aria-label',
+            `Ignore lint issue: ${issue.message}`
+        );
+        ignoreBtn.setAttribute('type', 'button');
+        ignoreBtn.onclick = () => context.actions.ignore();
+        actions.appendChild(ignoreBtn);
+
         const dismissBtn = document.createElement('button');
         dismissBtn.className = 'lint-popover__btn lint-popover__btn--dismiss';
         dismissBtn.textContent = 'Dismiss';
@@ -72,10 +84,18 @@ export function createDefaultPopover(context: PopoverContext): HTMLElement {
 }
 
 /**
+ * Callback type for ignore action.
+ * Called when user clicks ignore button to add issues to ignored list.
+ *
+ * Requirement: 9.2, 9.5
+ */
+export type OnIgnoreCallback = (issues: Issue[]) => void;
+
+/**
  * PopoverManager handles the display and interaction of lint issue popovers.
  * It manages positioning, close handlers, and action execution.
  *
- * Requirements: 8.1, 8.4, 18.6, 19.1-19.5
+ * Requirements: 8.1, 8.4, 18.6, 19.1-19.5, 9.2, 9.5
  */
 export class PopoverManager {
     private popoverEl: HTMLElement | null = null;
@@ -83,14 +103,20 @@ export class PopoverManager {
     private vueApp: App | null = null;
     private view: EditorView;
     private options: PopoverOptions;
+    private onIgnore: OnIgnoreCallback | null = null;
     private boundHandleClickOutside: (event: MouseEvent) => void;
     private boundHandleKeyDown: (event: KeyboardEvent) => void;
     private boundHandleScroll: () => void;
     private rafId: number | null = null;
 
-    constructor(view: EditorView, options: PopoverOptions = {}) {
+    constructor(
+        view: EditorView,
+        options: PopoverOptions = {},
+        onIgnore?: OnIgnoreCallback
+    ) {
         this.view = view;
         this.options = options;
+        this.onIgnore = onIgnore ?? null;
         this.boundHandleClickOutside = this.handleClickOutside.bind(this);
         this.boundHandleKeyDown = this.handleKeyDown.bind(this);
         this.boundHandleScroll = this.handleScroll.bind(this);
@@ -133,6 +159,7 @@ export class PopoverManager {
             deleteText: () => this.deleteText(issues),
             replaceText: (newText: string) => this.replaceText(issues, newText),
             dismiss: () => this.hide(),
+            ignore: () => this.ignoreIssues(issues),
         };
 
         const context: PopoverContext = {
@@ -461,6 +488,22 @@ export class PopoverManager {
                 .setMeta('linterFix', true); // Mark as linter fix to skip async re-run
             this.view.dispatch(tr);
             this.view.focus();
+        }
+        this.hide();
+    }
+
+    /**
+     * Ignore the given issues - adds them to the ignored list and triggers decoration update.
+     * Closes the popover after ignoring.
+     *
+     * Requirements: 9.2, 9.5
+     *
+     * @param issues - The issues to ignore
+     */
+    private ignoreIssues(issues: Issue[]): void {
+        // Call the onIgnore callback if provided
+        if (this.onIgnore) {
+            this.onIgnore(issues);
         }
         this.hide();
     }

@@ -10,8 +10,11 @@ import type { Component } from 'vue';
  * - info: Informational suggestions
  * - warning: Potential problems that should be reviewed
  * - error: Critical issues that should be fixed
+ * - string: Custom severity names defined via customSeverities option
+ *
+ * Requirements: 8.1
  */
-export type Severity = 'info' | 'warning' | 'error';
+export type Severity = 'info' | 'warning' | 'error' | (string & {});
 
 /**
  * Fix function signature for automatic issue correction
@@ -55,6 +58,60 @@ export type LinterPluginClass = new (
 export type AsyncLinterPluginClass = new (
     doc: ProsemirrorNode
 ) => LinterPluginInterface;
+
+// ============================================================================
+// On-Demand Linting Types (Requirements 6.1, 7.1, 8.1, 9.3)
+// ============================================================================
+
+/**
+ * Configuration for individual plugins with execution mode settings.
+ * Allows per-plugin control over automatic vs on-demand execution.
+ *
+ * Requirements: 7.1
+ */
+export interface PluginConfig {
+    /** The plugin class to use */
+    plugin: LinterPluginClass | AsyncLinterPluginClass;
+    /** Execution mode: 'auto' runs on document changes, 'onDemand' requires manual trigger */
+    mode?: 'auto' | 'onDemand';
+}
+
+/**
+ * Custom severity definition for extending beyond built-in info/warning/error levels.
+ *
+ * Requirements: 8.1
+ */
+export interface CustomSeverity {
+    /** Unique name for the severity level */
+    name: string;
+    /** CSS color value for highlighting and icons */
+    color: string;
+}
+
+/**
+ * Represents an issue that has been ignored by the user.
+ * Used to prevent re-displaying dismissed issues at the same position.
+ *
+ * Requirements: 9.3
+ */
+export interface IgnoredIssue {
+    /** Start position in document where issue was ignored */
+    from: number;
+    /** End position in document where issue was ignored */
+    to: number;
+    /** Issue message to match */
+    message: string;
+}
+
+/**
+ * Options for the runRule method when executing plugins on-demand.
+ *
+ * Requirements: 3.1, 3.2
+ */
+export interface RunRuleOptions {
+    /** Whether to apply results as decorations (default: false) */
+    applyResults?: boolean;
+}
 
 // ============================================================================
 // AI Linter Plugin Types (Requirements 13.1, 14.1, 14.2, 14.3, 14.4)
@@ -169,6 +226,14 @@ export interface PopoverActions {
      * Requirement: 19.4
      */
     dismiss: () => void;
+
+    /**
+     * Ignore the current issue(s) - removes decoration and prevents re-display.
+     * The issue will be added to the ignored issues list and won't appear again
+     * at the same position with the same message.
+     * Requirement: 9.5
+     */
+    ignore: () => void;
 }
 
 /**

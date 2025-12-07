@@ -1021,3 +1021,151 @@ describe('Custom Popover Renderer Property Tests', () => {
         }
     );
 });
+
+describe('Linter autoLint Configuration Property Tests', () => {
+    // **Feature: on-demand-linting, Property 4: autoLint disabled behavior**
+    // **Validates: Requirements 6.1, 6.2, 6.3**
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 5 }
+            ),
+            fc.string({ minLength: 1, maxLength: 10 }), // text to insert for doc change
+        ],
+        { numRuns: 100 }
+    )(
+        'when autoLint is false, plugins do not run automatically and decorations remain empty',
+        async (issueInputs, textToInsert) => {
+            // Convert inputs to valid issues with proper positions
+            const issues = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const TestPluginClass = createTestPluginClass(issues);
+
+            // Create editor with autoLint disabled (Requirement 6.1)
+            const editor = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        autoLint: false,
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Property: When autoLint is false, stored issues should be empty (Requirement 6.1)
+            const initialIssues = editor.storage.linter.getIssues();
+            expect(initialIssues).toHaveLength(0);
+
+            // Property: Decorations should be empty
+            const editorEl = editor.view.dom;
+            const lintIcons = editorEl.querySelectorAll('.lint-icon');
+            expect(lintIcons.length).toBe(0);
+
+            // Now change the document (Requirement 6.2)
+            editor.commands.insertContent(textToInsert);
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Property: After doc change with autoLint false, issues should still be empty (Requirement 6.2)
+            const issuesAfterChange = editor.storage.linter.getIssues();
+            expect(issuesAfterChange).toHaveLength(0);
+
+            // Property: Decorations should still be empty after doc change
+            const lintIconsAfterChange =
+                editorEl.querySelectorAll('.lint-icon');
+            expect(lintIconsAfterChange.length).toBe(0);
+
+            editor.destroy();
+        }
+    );
+
+    // Test that autoLint true (default) still works correctly
+    test.prop(
+        [
+            fc.array(
+                fc.record({
+                    message: fc.string({ minLength: 1, maxLength: 20 }),
+                    from: fc.integer({ min: 1, max: 10 }),
+                    toOffset: fc.integer({ min: 1, max: 5 }),
+                    severity: severityArb,
+                }),
+                { minLength: 1, maxLength: 5 }
+            ),
+        ],
+        { numRuns: 100 }
+    )(
+        'when autoLint is true or omitted, plugins run automatically (Requirement 6.4)',
+        async (issueInputs) => {
+            // Convert inputs to valid issues with proper positions
+            const issues = issueInputs.map((input, idx) => ({
+                message: input.message,
+                from: 1 + idx,
+                to: 1 + idx + input.toOffset,
+                severity: input.severity,
+            }));
+
+            const TestPluginClass = createTestPluginClass(issues);
+
+            // Create editor with autoLint explicitly true
+            const editorExplicitTrue = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        autoLint: true,
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Property: When autoLint is true, plugins should run and issues should be detected
+            const issuesExplicitTrue =
+                editorExplicitTrue.storage.linter.getIssues();
+            expect(issuesExplicitTrue).toHaveLength(issues.length);
+
+            editorExplicitTrue.destroy();
+
+            // Create editor with autoLint omitted (default behavior)
+            const editorDefault = new Editor({
+                extensions: [
+                    Document,
+                    Paragraph,
+                    Text,
+                    Linter.configure({
+                        plugins: [TestPluginClass],
+                        // autoLint omitted - should default to true
+                    }),
+                ],
+                content: '<p>This is test content for the linter to scan.</p>',
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+
+            // Property: When autoLint is omitted, plugins should run (default true behavior)
+            const issuesDefault = editorDefault.storage.linter.getIssues();
+            expect(issuesDefault).toHaveLength(issues.length);
+
+            editorDefault.destroy();
+        }
+    );
+});

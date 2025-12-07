@@ -33,20 +33,25 @@ Linter.configure(options: LinterOptions)
 
 ### LinterOptions
 
-| Property  | Type                                                 | Default     | Description                      |
-| --------- | ---------------------------------------------------- | ----------- | -------------------------------- |
-| `plugins` | `Array<LinterPluginClass \| AsyncLinterPluginClass>` | `[]`        | Array of plugin classes to run   |
-| `popover` | `PopoverOptions`                                     | `undefined` | Popover configuration (optional) |
+| Property           | Type                                                                 | Default     | Description                                        |
+| ------------------ | -------------------------------------------------------------------- | ----------- | -------------------------------------------------- |
+| `plugins`          | `Array<LinterPluginClass \| AsyncLinterPluginClass \| PluginConfig>` | `[]`        | Array of plugin classes or plugin configurations   |
+| `popover`          | `PopoverOptions`                                                     | `undefined` | Popover configuration (optional)                   |
+| `autoLint`         | `boolean`                                                            | `true`      | Whether to run plugins automatically on changes    |
+| `customSeverities` | `CustomSeverity[]`                                                   | `undefined` | Custom severity definitions with colors (optional) |
 
 ### LinterStorage
 
 Access via `editor.storage.linter`:
 
-| Property         | Type                     | Description                                  |
-| ---------------- | ------------------------ | -------------------------------------------- |
-| `issues`         | `Issue[]`                | Current array of detected issues             |
-| `getIssues()`    | `() => Issue[]`          | Returns the current issues array             |
-| `popoverManager` | `PopoverManager \| null` | PopoverManager instance (if popover enabled) |
+| Property               | Type                                                                                                  | Description                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `issues`               | `Issue[]`                                                                                             | Current array of detected issues             |
+| `getIssues()`          | `() => Issue[]`                                                                                       | Returns the current issues array             |
+| `popoverManager`       | `PopoverManager \| null`                                                                              | PopoverManager instance (if popover enabled) |
+| `runRule()`            | `(plugin: LinterPluginClass \| AsyncLinterPluginClass, options?: RunRuleOptions) => Promise<Issue[]>` | Run a specific plugin on-demand              |
+| `ignoredIssues`        | `IgnoredIssue[]`                                                                                      | List of issues that have been ignored        |
+| `clearIgnoredIssues()` | `() => void`                                                                                          | Clear all ignored issues                     |
 
 ### Example
 
@@ -67,6 +72,142 @@ const editor = new Editor({
 
 // Access issues
 const issues = editor.storage.linter.getIssues();
+```
+
+### On-Demand Linting
+
+The Linter supports running specific plugins on-demand rather than automatically on every document change.
+
+#### Disabling Automatic Linting
+
+Set `autoLint: false` to disable automatic linting. You can then run rules manually using `runRule()`:
+
+```typescript
+const editor = new Editor({
+    extensions: [
+        Linter.configure({
+            plugins: [BadWords, Punctuation],
+            autoLint: false, // Disable automatic linting
+        }),
+    ],
+});
+
+// Run a specific rule on-demand
+const issues = await editor.storage.linter.runRule(BadWords);
+console.log('Found issues:', issues);
+```
+
+#### Per-Plugin Mode Configuration
+
+Configure individual plugins to run only on-demand while others run automatically:
+
+```typescript
+import { Linter, BadWords, Punctuation } from 'tiptap-linter';
+import type { PluginConfig } from 'tiptap-linter';
+
+const editor = new Editor({
+    extensions: [
+        Linter.configure({
+            plugins: [
+                BadWords, // Runs automatically (default mode: 'auto')
+                { plugin: Punctuation, mode: 'auto' }, // Explicit auto mode
+                { plugin: AIGrammarChecker, mode: 'onDemand' }, // Only runs when called via runRule()
+            ],
+        }),
+    ],
+});
+
+// Run the on-demand plugin manually
+const grammarIssues = await editor.storage.linter.runRule(AIGrammarChecker);
+```
+
+#### runRule Options
+
+The `runRule()` method accepts an optional options object:
+
+```typescript
+interface RunRuleOptions {
+    /** Whether to apply results as decorations (default: false) */
+    applyResults?: boolean;
+}
+```
+
+Example with `applyResults`:
+
+```typescript
+// Run rule and apply decorations to the editor
+await editor.storage.linter.runRule(BadWords, { applyResults: true });
+
+// Run rule without modifying decorations (just get the issues)
+const issues = await editor.storage.linter.runRule(BadWords, {
+    applyResults: false,
+});
+```
+
+### Custom Severities
+
+Define custom severity levels beyond the built-in `info`, `warning`, and `error`:
+
+```typescript
+const editor = new Editor({
+    extensions: [
+        Linter.configure({
+            plugins: [BadWords],
+            customSeverities: [
+                { name: 'suggestion', color: '#6366f1' },
+                { name: 'critical', color: '#dc2626' },
+                { name: 'style', color: '#8b5cf6' },
+            ],
+        }),
+    ],
+});
+```
+
+Custom severities automatically generate CSS classes:
+
+-   `.problem--{name}` for inline highlights
+-   `.lint-icon--{name}` for icons
+
+Use custom severities in your plugins:
+
+```typescript
+class MyPlugin extends LinterPlugin {
+    scan(): this {
+        // Use a custom severity
+        this.record('Consider rephrasing', from, to, 'suggestion');
+        return this;
+    }
+}
+```
+
+### Ignoring Issues
+
+Users can ignore specific issues via the popover's ignore button. Ignored issues are stored and won't be displayed again at the same position with the same message.
+
+```typescript
+// Access ignored issues
+const ignored = editor.storage.linter.ignoredIssues;
+
+// Clear all ignored issues
+editor.storage.linter.clearIgnoredIssues();
+```
+
+The ignore action is also available in custom popover renderers via `actions.ignore()`:
+
+```typescript
+Linter.configure({
+    plugins: [BadWords],
+    popover: {
+        renderer: (context) => {
+            const el = document.createElement('div');
+            const ignoreBtn = document.createElement('button');
+            ignoreBtn.textContent = 'Ignore';
+            ignoreBtn.onclick = () => context.actions.ignore();
+            el.appendChild(ignoreBtn);
+            return el;
+        },
+    },
+});
 ```
 
 ---
@@ -460,8 +601,10 @@ import { HeadingLevel } from 'tiptap-linter';
 ### Severity
 
 ```typescript
-type Severity = 'info' | 'warning' | 'error';
+type Severity = 'info' | 'warning' | 'error' | (string & {});
 ```
+
+Custom severity names can be used when `customSeverities` is configured.
 
 ### Issue
 
@@ -549,6 +692,7 @@ interface PopoverActions {
     deleteText: () => void;
     replaceText: (newText: string) => void;
     dismiss: () => void;
+    ignore: () => void;
 }
 ```
 
@@ -580,6 +724,50 @@ type LinterPluginClass = new (doc: ProsemirrorNode) => LinterPluginInterface;
 type AsyncLinterPluginClass = new (
     doc: ProsemirrorNode
 ) => LinterPluginInterface;
+```
+
+### PluginConfig
+
+```typescript
+interface PluginConfig {
+    /** The plugin class to use */
+    plugin: LinterPluginClass | AsyncLinterPluginClass;
+    /** Execution mode: 'auto' runs on document changes, 'onDemand' requires manual trigger */
+    mode?: 'auto' | 'onDemand';
+}
+```
+
+### CustomSeverity
+
+```typescript
+interface CustomSeverity {
+    /** Unique name for the severity level */
+    name: string;
+    /** CSS color value for highlighting and icons */
+    color: string;
+}
+```
+
+### IgnoredIssue
+
+```typescript
+interface IgnoredIssue {
+    /** Start position in document where issue was ignored */
+    from: number;
+    /** End position in document where issue was ignored */
+    to: number;
+    /** Issue message to match */
+    message: string;
+}
+```
+
+### RunRuleOptions
+
+```typescript
+interface RunRuleOptions {
+    /** Whether to apply results as decorations (default: false) */
+    applyResults?: boolean;
+}
 ```
 
 ---
@@ -638,21 +826,23 @@ function createDefaultPopover(context: PopoverContext): HTMLElement;
 
 ### Inline Decorations
 
-| Class               | Description                          |
-| ------------------- | ------------------------------------ |
-| `.problem`          | Base class for all inline highlights |
-| `.problem--info`    | Info severity highlight              |
-| `.problem--warning` | Warning severity highlight           |
-| `.problem--error`   | Error severity highlight             |
+| Class               | Description                                       |
+| ------------------- | ------------------------------------------------- |
+| `.problem`          | Base class for all inline highlights              |
+| `.problem--info`    | Info severity highlight                           |
+| `.problem--warning` | Warning severity highlight                        |
+| `.problem--error`   | Error severity highlight                          |
+| `.problem--{name}`  | Custom severity highlight (generated dynamically) |
 
 ### Widget Icons
 
-| Class                 | Description               |
-| --------------------- | ------------------------- |
-| `.lint-icon`          | Base class for lint icons |
-| `.lint-icon--info`    | Info severity icon        |
-| `.lint-icon--warning` | Warning severity icon     |
-| `.lint-icon--error`   | Error severity icon       |
+| Class                 | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `.lint-icon`          | Base class for lint icons                    |
+| `.lint-icon--info`    | Info severity icon                           |
+| `.lint-icon--warning` | Warning severity icon                        |
+| `.lint-icon--error`   | Error severity icon                          |
+| `.lint-icon--{name}`  | Custom severity icon (generated dynamically) |
 
 ### Popover
 
@@ -670,3 +860,4 @@ function createDefaultPopover(context: PopoverContext): HTMLElement;
 | `.lint-popover__btn`            | Base button class              |
 | `.lint-popover__btn--fix`       | Fix button                     |
 | `.lint-popover__btn--dismiss`   | Dismiss button                 |
+| `.lint-popover__btn--ignore`    | Ignore button                  |

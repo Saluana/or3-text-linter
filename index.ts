@@ -28,6 +28,12 @@ export type {
     AIResponse,
     AILinterPluginConfig,
 
+    // On-demand linting types (Requirements 4.1, 6.1, 7.1, 8.1, 9.3)
+    PluginConfig,
+    CustomSeverity,
+    IgnoredIssue,
+    RunRuleOptions,
+
     // Popover system types (Requirements 18.1, 18.5, 18.6, 19.1-19.5)
     PopoverActions,
     PopoverContext,
